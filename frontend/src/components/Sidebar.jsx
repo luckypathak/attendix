@@ -8,7 +8,7 @@ import {
 import { 
   LayoutDashboard, CalendarRange, FileSpreadsheet, 
   WalletCards, CheckSquare, MessageSquareShare, FileClock, Shield,
-  Users
+  Users, Landmark
 } from 'lucide-react';
 
 const drawerWidth = 240;
