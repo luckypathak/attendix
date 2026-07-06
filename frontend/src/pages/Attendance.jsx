@@ -22,11 +22,13 @@ export default function Attendance() {
   const [attendanceToday, setAttendanceToday] = useState(null);
   const [history, setHistory] = useState([]);
   const [adminRecords, setAdminRecords] = useState([]);
+  const [overtimeRequests, setOvertimeRequests] = useState([]);
 
   useEffect(() => {
     fetchHistory();
     if (isAdmin) {
       fetchAdminRecords();
+      fetchOvertimeRequests();
     }
   }, [isAdmin]);
 
@@ -35,7 +37,6 @@ export default function Attendance() {
       const response = await api.get('/attendance/records/history/');
       setHistory(response.data);
       
-      // Determine if already checked in today using local client time
       const d = new Date();
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -68,6 +69,35 @@ export default function Attendance() {
     }
   };
 
+  const fetchOvertimeRequests = async () => {
+    try {
+      const response = await api.get('/attendance/overtime/');
+      setOvertimeRequests(response.data.results || response.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleApproveOvertime = async (id) => {
+    try {
+      await api.post(`/attendance/overtime/${id}/approve/`);
+      fetchOvertimeRequests();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to approve overtime.');
+    }
+  };
+
+  const handleRejectOvertime = async (id) => {
+    try {
+      await api.post(`/attendance/overtime/${id}/reject/`);
+      fetchOvertimeRequests();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to reject overtime.');
+    }
+  };
+
   const captureLocation = () => {
     if (!navigator.geolocation) {
       setGpsError("Geolocation is not supported by your browser.");
@@ -89,7 +119,6 @@ export default function Attendance() {
           return;
         }
 
-        // reverse geocode simulation (standard openstreetmaps fallback)
         try {
           const geocodeRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
           const data = await geocodeRes.json();
@@ -164,6 +193,7 @@ export default function Attendance() {
       setGpsData(null);
       setAddress('');
       fetchHistory();
+      fetchOvertimeRequests();
     } catch (e) {
       setGpsError(getError(e, "Failed to check out."));
     }
@@ -295,7 +325,7 @@ export default function Attendance() {
 
               <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid rgba(255,255,255,0.05)' }}>
                 <Table>
-                  <TableHead>
+                  <TableHead sx={{ bgcolor: 'background.neutral' }}>
                     <TableRow>
                       {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Employee</TableCell>}
                       <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
@@ -315,7 +345,7 @@ export default function Attendance() {
                     ) : (
                       (isAdmin ? adminRecords : history).map((rec) => (
                         <TableRow key={rec.id}>
-                          {isAdmin && <TableCell>{rec.employee_name}</TableCell>}
+                          {isAdmin && <TableCell sx={{ fontWeight: 600 }}>{rec.employee_name}</TableCell>}
                           <TableCell>{formatDate(rec.date)}</TableCell>
                           <TableCell>{rec.check_in_time || '--'}</TableCell>
                           <TableCell>{rec.check_out_time || '--'}</TableCell>
@@ -354,6 +384,81 @@ export default function Attendance() {
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Overtime Approval Registry for Admin/Managers */}
+        {isAdmin && (
+          <Grid item xs={12}>
+            <Card sx={{ border: (theme) => `1px solid ${theme.palette.divider}` }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>
+                  Overtime Approvals Registry
+                </Typography>
+                <TableContainer component={Paper} elevation={0}>
+                  <Table>
+                    <TableHead sx={{ bgcolor: 'background.neutral' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Employee</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Hours Calculated</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {overtimeRequests.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                            No overtime requests found.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        overtimeRequests.map((ot) => (
+                          <TableRow key={ot.id} hover>
+                            <TableCell sx={{ fontWeight: 600 }}>{ot.employee_name}</TableCell>
+                            <TableCell>{formatDate(ot.date)}</TableCell>
+                            <TableCell>{ot.hours} hours</TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={ot.status} 
+                                color={ot.status === 'APPROVED' ? 'success' : ot.status === 'REJECTED' ? 'error' : 'warning'} 
+                                size="small" 
+                                sx={{ fontWeight: 600 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {ot.status === 'PENDING' ? (
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <Button 
+                                    variant="contained" 
+                                    color="success" 
+                                    size="small"
+                                    onClick={() => handleApproveOvertime(ot.id)}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button 
+                                    variant="outlined" 
+                                    color="error" 
+                                    size="small"
+                                    onClick={() => handleRejectOvertime(ot.id)}
+                                  >
+                                    Reject
+                                  </Button>
+                                </Box>
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">Processed</Typography>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
       </Grid>
     </Box>
   );
