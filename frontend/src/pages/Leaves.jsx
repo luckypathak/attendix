@@ -9,6 +9,11 @@ import {
 } from '@mui/material';
 import { Send, FileText, CalendarRange } from 'lucide-react';
 import api from '../services/api';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+import { formatDate } from '../utils/format';
 
 export default function Leaves() {
   const { user } = useSelector((state) => state.auth);
@@ -16,8 +21,8 @@ export default function Leaves() {
 
   // Forms states
   const [leaveType, setLeaveType] = useState('CASUAL');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
   const [reason, setReason] = useState('');
   
   const [balances, setBalances] = useState([]);
@@ -79,13 +84,13 @@ export default function Leaves() {
     try {
       await api.post('/leaves/requests/', {
         leave_type: leaveType,
-        start_date: startDate,
-        end_date: endDate,
+        start_date: startDate ? startDate.format('YYYY-MM-DD') : '',
+        end_date: endDate ? endDate.format('YYYY-MM-DD') : '',
         reason: reason
       });
       setMessage({ type: 'success', text: 'Leave request submitted successfully!' });
-      setStartDate('');
-      setEndDate('');
+      setStartDate(null);
+      setEndDate(null);
       setReason('');
       fetchRequests();
     } catch (err) {
@@ -224,42 +229,39 @@ export default function Leaves() {
                   </Alert>
                 )}
 
-                <Box component="form" onSubmit={handleSubmit}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Leave Type"
-                    value={leaveType}
-                    onChange={(e) => setLeaveType(e.target.value)}
-                    sx={{ mb: 2 }}
-                  >
-                    <MenuItem value="CASUAL">Casual Leave</MenuItem>
-                    <MenuItem value="SICK">Sick Leave</MenuItem>
-                    <MenuItem value="PAID">Paid Leave</MenuItem>
-                    <MenuItem value="UNPAID">Unpaid Leave</MenuItem>
-                  </TextField>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <Box component="form" onSubmit={handleSubmit}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Leave Type"
+                      value={leaveType}
+                      onChange={(e) => setLeaveType(e.target.value)}
+                      sx={{ mb: 2 }}
+                    >
+                      <MenuItem value="CASUAL">Casual Leave</MenuItem>
+                      <MenuItem value="SICK">Sick Leave</MenuItem>
+                      <MenuItem value="PAID">Paid Leave</MenuItem>
+                      <MenuItem value="UNPAID">Unpaid Leave</MenuItem>
+                    </TextField>
 
-                  <TextField
-                    type="date"
-                    fullWidth
-                    label="Start Date"
-                    InputLabelProps={{ shrink: true }}
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    sx={{ mb: 2 }}
-                    required
-                  />
+                    <Box sx={{ mb: 2 }}>
+                      <DatePicker
+                        label="Start Date"
+                        value={startDate}
+                        onChange={(newValue) => setStartDate(newValue)}
+                        slotProps={{ textField: { fullWidth: true } }}
+                      />
+                    </Box>
 
-                  <TextField
-                    type="date"
-                    fullWidth
-                    label="End Date"
-                    InputLabelProps={{ shrink: true }}
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    sx={{ mb: 2 }}
-                    required
-                  />
+                    <Box sx={{ mb: 2 }}>
+                      <DatePicker
+                        label="End Date"
+                        value={endDate}
+                        onChange={(newValue) => setEndDate(newValue)}
+                        slotProps={{ textField: { fullWidth: true } }}
+                      />
+                    </Box>
 
                   <TextField
                     fullWidth
@@ -283,6 +285,7 @@ export default function Leaves() {
                     {formLoading ? <CircularProgress size={24} /> : 'Submit Request'}
                   </Button>
                 </Box>
+              </LocalizationProvider>
               </CardContent>
             </Card>
           </Grid>
@@ -319,7 +322,7 @@ export default function Leaves() {
                         <TableRow key={req.id}>
                           {isAdmin && <TableCell>{req.employee_name}</TableCell>}
                           <TableCell>{req.leave_type}</TableCell>
-                          <TableCell>{req.start_date} to {req.end_date}</TableCell>
+                          <TableCell>{formatDate(req.start_date)} to {formatDate(req.end_date)}</TableCell>
                           <TableCell>
                             <Chip 
                               label={req.status} 

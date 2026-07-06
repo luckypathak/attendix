@@ -48,9 +48,7 @@ export default function Reimbursements() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setFilePreview(reader.result);
-        // In a real app we upload to Cloudinary and get a URL.
-        // For local prototype we mock the uploaded URL.
-        setFileUrl("https://res.cloudinary.com/demo/image/upload/v1620000000/sample.jpg");
+        setFileUrl(reader.result); // Store the actual base64 file data URL!
       };
       reader.readAsDataURL(file);
     }

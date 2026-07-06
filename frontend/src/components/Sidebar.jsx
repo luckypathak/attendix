@@ -27,6 +27,7 @@ export default function Sidebar({ open, mobileOpen, handleDrawerToggle }) {
     { text: 'Tasks', path: '/todos', icon: <CheckSquare size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE'] },
     { text: 'SMS Gateway', path: '/sms', icon: <MessageSquareShare size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
     { text: 'Audit Logs', path: '/audit', icon: <FileClock size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
+    { text: 'Companies', path: '/companies', icon: <Landmark size={20} />, roles: ['SUPER_ADMIN'] },
   ];
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(role));

@@ -37,3 +37,11 @@ class TodoViewSet(viewsets.ModelViewSet):
         todo.is_completed = not todo.is_completed
         todo.save()
         return Response(TodoSerializer(todo).data)
+
+    def destroy(self, request, *args, **kwargs):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN']:
+            return Response(
+                {"detail": "Only administrators can delete tasks."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)

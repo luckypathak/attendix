@@ -18,7 +18,7 @@ class Reimbursement(SoftDeleteModel):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    receipt_url = models.URLField(blank=True, null=True) # Cloudinary storage path
+    receipt_url = models.TextField(blank=True, null=True) # Base64 receipt data or URL
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     manager_comments = models.TextField(blank=True, null=True)
     approved_by = models.ForeignKey(

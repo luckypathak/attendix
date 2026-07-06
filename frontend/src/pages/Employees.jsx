@@ -9,6 +9,10 @@ import {
 } from '@mui/material';
 import { UserPlus, Shield, Landmark, Calendar, Mail, User, Clock, Settings, Trash2, ArrowRightLeft } from 'lucide-react';
 import api from '../services/api';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 
 export default function Employees() {
   const { user } = useSelector((state) => state.auth);
@@ -101,6 +105,9 @@ export default function Employees() {
   };
 
   const handleOpenModal = () => {
+    if (isManager) {
+      setFirmId(user?.firm_id || user?.firm || '');
+    }
     setOpenModal(true);
     setFormMessage(null);
   };
@@ -159,7 +166,7 @@ export default function Employees() {
     setRole('EMPLOYEE');
     setBaseSalary('45000');
     setShiftId('');
-    setFirmId('');
+    setFirmId(isManager ? (user?.firm_id || user?.firm || '') : '');
     setPfDeduction(false);
     setShiftStartTime('');
     setShiftEndTime('');
@@ -497,36 +504,39 @@ export default function Employees() {
                   required={!editingEmployee}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Role"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  required
-                >
-                  <MenuItem value="EMPLOYEE">Employee</MenuItem>
-                  <MenuItem value="MANAGER">Manager</MenuItem>
-                  <MenuItem value="COMPANY_ADMIN">Company Admin</MenuItem>
-                </TextField>
-              </Grid>
+              {!isManager && (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    required
+                  >
+                    <MenuItem value="EMPLOYEE">Employee</MenuItem>
+                    <MenuItem value="MANAGER">Manager</MenuItem>
+                    <MenuItem value="COMPANY_ADMIN">Company Admin</MenuItem>
+                  </TextField>
+                </Grid>
+              )}
 
-              {/* Firm Selection */}
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Firm / Branch"
-                  value={firmId}
-                  onChange={(e) => setFirmId(e.target.value)}
-                >
-                  <MenuItem value=""><em>None (No Branch)</em></MenuItem>
-                  {firms.map((f) => (
-                    <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
+              {!isManager && (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Firm / Branch"
+                    value={firmId}
+                    onChange={(e) => setFirmId(e.target.value)}
+                  >
+                    <MenuItem value=""><em>None (No Branch)</em></MenuItem>
+                    {firms.map((f) => (
+                      <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+              )}
 
               {/* Shift Timing Selection */}
               <Grid item xs={12} sm={6}>
@@ -584,14 +594,14 @@ export default function Employees() {
               </Grid>
               
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Joining Date"
-                  type="date"
-                  value={joiningDate}
-                  onChange={(e) => setJoiningDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    label="Joining Date"
+                    value={joiningDate ? dayjs(joiningDate) : null}
+                    onChange={(newValue) => setJoiningDate(newValue ? newValue.format('YYYY-MM-DD') : '')}
+                    slotProps={{ textField: { fullWidth: true } }}
+                  />
+                </LocalizationProvider>
               </Grid>
 
               {/* PF Deduction check */}

@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Companies from './pages/Companies';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="todos" element={<Todos />} />
           <Route path="sms" element={<SMSGateway />} />
           <Route path="audit" element={<AuditLogs />} />
+          <Route path="companies" element={<Companies />} />
         </Route>
 
         {/* Catch-all fallback */}

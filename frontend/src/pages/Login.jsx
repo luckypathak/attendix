@@ -131,12 +131,6 @@ export default function Login() {
                 )}
               </Button>
             </Box>
-
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
-              <Link to="/register" style={{ fontSize: '0.85rem', color: '#9d4ede', textDecoration: 'none', fontWeight: 500 }}>
-                Don't have an account? Sign Up
-              </Link>
-            </Box>
           </CardContent>
         </Card>
       </Container>

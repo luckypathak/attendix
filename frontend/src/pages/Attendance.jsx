@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { MapPin, ShieldAlert, CheckCircle, Clock } from 'lucide-react';
 import api from '../services/api';
+import { formatDate } from '../utils/format';
 
 export default function Attendance() {
   const { user } = useSelector((state) => state.auth);
@@ -315,7 +316,7 @@ export default function Attendance() {
                       (isAdmin ? adminRecords : history).map((rec) => (
                         <TableRow key={rec.id}>
                           {isAdmin && <TableCell>{rec.employee_name}</TableCell>}
-                          <TableCell>{rec.date}</TableCell>
+                          <TableCell>{formatDate(rec.date)}</TableCell>
                           <TableCell>{rec.check_in_time || '--'}</TableCell>
                           <TableCell>{rec.check_out_time || '--'}</TableCell>
                           <TableCell>
