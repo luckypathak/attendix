@@ -39,3 +39,26 @@ export const formatDateTime = (dateTimeStr) => {
   } catch (e) {}
   return dateTimeStr;
 };
+
+/**
+ * Utility helper to format HH:MM:SS or HH:MM to 12-hour format (AM/PM)
+ */
+export const formatTime12h = (timeStr) => {
+  if (!timeStr) return 'N/A';
+  if (timeStr.includes('AM') || timeStr.includes('PM') || timeStr.includes('am') || timeStr.includes('pm')) {
+    return timeStr;
+  }
+  try {
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      let hour = parseInt(parts[0], 10);
+      const min = parts[1];
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12;
+      hour = hour ? hour : 12; // 0 hour should be 12
+      const formattedHour = String(hour).padStart(2, '0');
+      return `${formattedHour}:${min} ${ampm}`;
+    }
+  } catch (e) {}
+  return timeStr;
+};

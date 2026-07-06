@@ -44,6 +44,7 @@ export default function Employees() {
   const [pfDeduction, setPfDeduction] = useState(false);
   const [shiftStartTime, setShiftStartTime] = useState('');
   const [shiftEndTime, setShiftEndTime] = useState('');
+  const [allowedLeaves, setAllowedLeaves] = useState('12');
 
   // Related dropdown collections
   const [shifts, setShifts] = useState([]);
@@ -123,6 +124,7 @@ export default function Employees() {
     setBaseSalary(emp.base_salary);
     setJoiningDate(emp.joining_date);
     setFirmId(emp.firm_id || '');
+    setAllowedLeaves(emp.allowed_leaves || '12');
     setPfDeduction(emp.pf_deduction || false);
     if (emp.shift_start_time && emp.shift_end_time) {
       setShiftStartTime(emp.shift_start_time);
@@ -167,6 +169,7 @@ export default function Employees() {
     setBaseSalary('45000');
     setShiftId('');
     setFirmId(isManager ? (user?.firm_id || user?.firm || '') : '');
+    setAllowedLeaves('12');
     setPfDeduction(false);
     setShiftStartTime('');
     setShiftEndTime('');
@@ -189,7 +192,8 @@ export default function Employees() {
       shift_start_time: shiftId === 'CUSTOM' ? shiftStartTime : null,
       shift_end_time: shiftId === 'CUSTOM' ? shiftEndTime : null,
       firm_id: firmId ? parseInt(firmId) : null,
-      pf_deduction: pfDeduction
+      pf_deduction: pfDeduction,
+      allowed_leaves: parseInt(allowedLeaves, 10) || 12
     };
 
     if (password) {
@@ -393,7 +397,7 @@ export default function Employees() {
                       </TableCell>
                       <TableCell>
                         <Chip 
-                          label={emp.shift_name || 'Standard (8h)'} 
+                          label={emp.shift_name ? `${emp.shift_name} (${emp.shift_start_time} - ${emp.shift_end_time})` : 'Standard (8h)'} 
                           size="small"
                           icon={<Clock size={12} />}
                           sx={{ fontWeight: 600, fontSize: '0.7rem' }} 
@@ -603,6 +607,18 @@ export default function Employees() {
                   />
                 </LocalizationProvider>
               </Grid>
+
+              {!isManager && (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    type="number"
+                    fullWidth
+                    label="Allowed Leaves (Yearly)"
+                    value={allowedLeaves}
+                    onChange={(e) => setAllowedLeaves(e.target.value)}
+                  />
+                </Grid>
+              )}
 
               {/* PF Deduction check */}
               <Grid item xs={12}>

@@ -3,13 +3,19 @@ from django.conf import settings
 from attendix.apps.company.models import Company, SoftDeleteModel
 
 
+class LeaveCategory(SoftDeleteModel):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='leave_categories')
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+
+    class Meta:
+        unique_together = ('company', 'name')
+
+    def __str__(self):
+        return f"{self.name} ({self.company.name})"
+
+
 class LeaveRequest(SoftDeleteModel):
-    LEAVE_TYPES = [
-        ('CASUAL', 'Casual Leave'),
-        ('SICK', 'Sick Leave'),
-        ('PAID', 'Paid Leave'),
-        ('UNPAID', 'Unpaid Leave')
-    ]
     STATUS_CHOICES = [
         ('PENDING', 'Pending Approval'),
         ('APPROVED', 'Approved'),
@@ -21,9 +27,10 @@ class LeaveRequest(SoftDeleteModel):
         on_delete=models.CASCADE,
         related_name='leave_requests'
     )
-    leave_type = models.CharField(max_length=20, choices=LEAVE_TYPES)
+    leave_type = models.CharField(max_length=100) # Dynamic category string
     start_date = models.DateField()
     end_date = models.DateField()
+    is_paid = models.BooleanField(default=True) # Decided by admin during approval
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     reason = models.TextField()
     manager_comments = models.TextField(blank=True, null=True)
@@ -48,7 +55,7 @@ class LeaveBalance(SoftDeleteModel):
         on_delete=models.CASCADE,
         related_name='leave_balances'
     )
-    leave_type = models.CharField(max_length=20, choices=LeaveRequest.LEAVE_TYPES)
+    leave_type = models.CharField(max_length=100)
     allocated = models.IntegerField(default=12)
     used = models.IntegerField(default=0)
     

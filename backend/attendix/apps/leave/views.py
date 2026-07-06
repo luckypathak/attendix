@@ -3,9 +3,24 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import LeaveRequest, LeaveBalance, Holiday
-from .serializers import LeaveRequestSerializer, LeaveBalanceSerializer, HolidaySerializer
+from .models import LeaveCategory, LeaveRequest, LeaveBalance, Holiday
+from .serializers import LeaveCategorySerializer, LeaveRequestSerializer, LeaveBalanceSerializer, HolidaySerializer
 from .services import LeaveService
+
+
+class LeaveCategoryViewSet(viewsets.ModelViewSet):
+    queryset = LeaveCategory.objects.all()
+    serializer_class = LeaveCategorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'SUPER_ADMIN':
+            return self.queryset
+        return self.queryset.filter(company=user.company)
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
 
 
 class LeaveRequestViewSet(viewsets.ModelViewSet):
@@ -39,8 +54,9 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         
         leave_req = self.get_object()
         manager_comments = request.data.get('manager_comments', '')
+        is_paid = request.data.get('is_paid', True)
         try:
-            LeaveService.approve_leave(leave_req, request.user, manager_comments)
+            LeaveService.approve_leave(leave_req, request.user, manager_comments, is_paid=is_paid)
             return Response(LeaveRequestSerializer(leave_req).data)
         except ValidationError as e:
             return Response({"detail": str(e.message if hasattr(e, 'message') else e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -48,15 +48,15 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
             'manager_id', 'manager_name', 'base_salary', 'hourly_rate', 'joining_date',
             'pan_number', 'bank_account_no', 'bank_ifsc_code', 'created_at', 'updated_at',
             'password', 'firm_id', 'firm_name', 'shift_id', 'shift_name', 'pf_deduction',
-            'shift_start_time', 'shift_end_time'
+            'shift_start_time', 'shift_end_time', 'allowed_leaves', 'used_leaves'
         )
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         ret['firm_id'] = instance.user.firm.id if (instance.user and instance.user.firm) else None
         ret['shift_id'] = instance.shift.id if instance.shift else None
-        ret['shift_start_time'] = instance.shift.start_time.strftime('%H:%M') if (instance.shift and instance.shift.start_time) else None
-        ret['shift_end_time'] = instance.shift.end_time.strftime('%H:%M') if (instance.shift and instance.shift.end_time) else None
+        ret['shift_start_time'] = instance.shift.start_time.strftime('%I:%M %p') if (instance.shift and instance.shift.start_time) else None
+        ret['shift_end_time'] = instance.shift.end_time.strftime('%I:%M %p') if (instance.shift and instance.shift.end_time) else None
         return ret
 
     def create(self, validated_data):
@@ -138,18 +138,7 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
             **validated_data
         )
 
-        # Initialize default leave balances for the new employee
-        try:
-            from attendix.apps.leave.models import LeaveBalance
-            for leave_type in ['CASUAL', 'SICK', 'PAID', 'UNPAID']:
-                default_allocated = 12 if leave_type == 'CASUAL' else (10 if leave_type == 'SICK' else (15 if leave_type == 'PAID' else 0))
-                LeaveBalance.objects.get_or_create(
-                    employee=user,
-                    leave_type=leave_type,
-                    defaults={'allocated': default_allocated, 'used': 0}
-                )
-        except Exception:
-            pass
+        # Profile creation complete
 
         return profile
 

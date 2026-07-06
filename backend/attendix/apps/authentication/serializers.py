@@ -27,17 +27,21 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             'role': self.user.role,
             'company_id': self.user.company_id if self.user.company else None,
             'firm_id': self.user.firm_id if self.user.firm else None,
-            'firm_name': self.user.firm.name if self.user.firm else None
+            'firm_name': self.user.firm.name if self.user.firm else None,
+            'allowed_leaves': self.user.employee_profile.allowed_leaves if hasattr(self.user, 'employee_profile') else 12,
+            'used_leaves': self.user.employee_profile.used_leaves if hasattr(self.user, 'employee_profile') else 0
         }
         return data
 
 
 class UserSerializer(serializers.ModelSerializer):
     firm_name = serializers.CharField(source='firm.name', read_only=True)
+    allowed_leaves = serializers.IntegerField(source='employee_profile.allowed_leaves', read_only=True)
+    used_leaves = serializers.IntegerField(source='employee_profile.used_leaves', read_only=True)
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'company', 'phone', 'is_active', 'firm', 'firm_name')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'company', 'phone', 'is_active', 'firm', 'firm_name', 'allowed_leaves', 'used_leaves')
         read_only_fields = ('id', 'is_active')
 
 

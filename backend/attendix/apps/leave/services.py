@@ -14,7 +14,7 @@ class LeaveService:
 
     @classmethod
     @transaction.atomic
-    def approve_leave(cls, leave_request, approver, manager_comments=""):
+    def approve_leave(cls, leave_request, approver, manager_comments="", is_paid=True):
         if leave_request.status != 'PENDING':
             raise ValidationError("This leave request has already been processed.")
 
@@ -22,21 +22,18 @@ class LeaveService:
         leave_days = cls.calculate_work_days(leave_request.start_date, leave_request.end_date)
         num_days = len(leave_days)
 
-        # Deduct balance if not unpaid leave
-        if leave_request.leave_type != 'UNPAID':
-            balance, created = LeaveBalance.objects.get_or_create(
-                employee=leave_request.employee,
-                leave_type=leave_request.leave_type,
-                defaults={'allocated': 12, 'used': 0}
-            )
-            if balance.remaining < num_days:
-                raise ValidationError(f"Insufficient leave balance. Remaining: {balance.remaining}, Requested: {num_days}")
-            
-            balance.used += num_days
-            balance.save()
+        # Deduct balance from EmployeeProfile if it is approved as a paid leave
+        profile = leave_request.employee.employee_profile
+        if is_paid:
+            remaining = profile.allowed_leaves - profile.used_leaves
+            if remaining < num_days:
+                raise ValidationError(f"Insufficient leave balance. Remaining: {remaining}, Requested: {num_days}")
+            profile.used_leaves += num_days
+            profile.save()
 
         # Update request
         leave_request.status = 'APPROVED'
+        leave_request.is_paid = is_paid
         leave_request.approved_by = approver
         leave_request.manager_comments = manager_comments
         leave_request.save()
@@ -48,7 +45,7 @@ class LeaveService:
                 date=date,
                 defaults={
                     'status': Attendance.Statuses.LEAVE,
-                    'check_in_address': f"Approved Leave: {leave_request.get_leave_type_display()}"
+                    'check_in_address': f"Approved Leave: {leave_request.leave_type}"
                 }
             )
 
@@ -77,15 +74,11 @@ class LeaveService:
             leave_days = cls.calculate_work_days(leave_request.start_date, leave_request.end_date)
             num_days = len(leave_days)
 
-            # Restore balance if not unpaid leave
-            if leave_request.leave_type != 'UNPAID':
-                balance = LeaveBalance.objects.filter(
-                    employee=leave_request.employee,
-                    leave_type=leave_request.leave_type
-                ).first()
-                if balance:
-                    balance.used = max(0, balance.used - num_days)
-                    balance.save()
+            # Restore balance in EmployeeProfile if it was a paid leave
+            if leave_request.is_paid:
+                profile = leave_request.employee.employee_profile
+                profile.used_leaves = max(0, profile.used_leaves - num_days)
+                profile.save()
 
             # Delete the attendance records that were marked as LEAVE for these dates
             Attendance.objects.filter(

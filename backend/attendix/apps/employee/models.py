@@ -43,6 +43,8 @@ class EmployeeProfile(SoftDeleteModel):
         related_name='employee_profiles'
     )
     pf_deduction = models.BooleanField(default=False)
+    allowed_leaves = models.IntegerField(default=12)
+    used_leaves = models.IntegerField(default=0)
 
     # Personal & HR details
     joining_date = models.DateField(null=True, blank=True)

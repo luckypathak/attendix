@@ -20,9 +20,9 @@ class AttendanceSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         if instance.check_in_time:
-            ret['check_in_time'] = instance.check_in_time.strftime('%H:%M:%S')
+            ret['check_in_time'] = instance.check_in_time.strftime('%I:%M %p')
         if instance.check_out_time:
-            ret['check_out_time'] = instance.check_out_time.strftime('%H:%M:%S')
+            ret['check_out_time'] = instance.check_out_time.strftime('%I:%M %p')
         return ret
 
 

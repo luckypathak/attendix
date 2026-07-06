@@ -95,16 +95,17 @@ class AttendanceService:
         now = timestamp or timezone.now()
         if timezone.is_aware(now):
             now = timezone.localtime(now)
-        today = now.date()
         time_now = now.time()
 
-        try:
-            attendance = Attendance.objects.get(employee=employee, date=today)
-        except Attendance.DoesNotExist:
-            raise ValidationError("No check-in record found for today. You must check-in first.")
+        # Find the most recent active check-in (supports overnight shift checkout on the next day)
+        attendance = Attendance.objects.filter(
+            employee=employee,
+            check_in_time__isnull=False,
+            check_out_time__isnull=True
+        ).order_by('-date', '-check_in_time').first()
 
-        if attendance.check_out_time is not None:
-            raise ValidationError("You have already checked out today.")
+        if not attendance:
+            raise ValidationError("No active check-in record found. You must check-in first.")
 
         attendance.check_out_time = time_now
         attendance.check_out_lat = lat
@@ -112,27 +113,37 @@ class AttendanceService:
         attendance.check_out_accuracy = accuracy
         attendance.check_out_address = address
         attendance.check_out_device_info = device_info
+
+        # Calculate duration of work
+        checkin_dt = datetime.datetime.combine(attendance.date, attendance.check_in_time)
+        checkout_dt = datetime.datetime.combine(now.date(), time_now)
+        hours_worked = (checkout_dt - checkin_dt).total_seconds() / 3600.0
+
+        # Half-day rule: If worked hours is less than 6 hours, downgrade status to HALF_DAY
+        if hours_worked < 6.0:
+            attendance.status = Attendance.Statuses.HALF_DAY
+
         attendance.save()
 
         # Overtime calculation
         shift = attendance.shift or cls.get_active_shift(employee)
         if shift:
-            shift_end = shift.end_time
-            dummy_date = datetime.date(2000, 1, 1)
-            end_datetime = datetime.datetime.combine(dummy_date, shift_end)
-            checkout_datetime = datetime.datetime.combine(dummy_date, time_now)
-
-            if checkout_datetime > end_datetime:
-                overtime_seconds = (checkout_datetime - end_datetime).total_seconds()
+            shift_end_datetime = datetime.datetime.combine(attendance.date, shift.end_time)
+            
+            # If they checked out after shift end time
+            if checkout_dt > shift_end_datetime:
+                overtime_seconds = (checkout_dt - shift_end_datetime).total_seconds()
                 overtime_hours = round(overtime_seconds / 3600.0, 2)
                 
                 if overtime_hours >= 0.5: # At least 30 minutes overtime to trigger a request
-                    Overtime.objects.create(
+                    Overtime.objects.get_or_create(
                         employee=employee,
                         attendance=attendance,
-                        date=today,
-                        hours=overtime_hours,
-                        status='PENDING'
+                        date=attendance.date,
+                        defaults={
+                            'hours': overtime_hours,
+                            'status': 'PENDING'
+                        }
                     )
 
         return attendance

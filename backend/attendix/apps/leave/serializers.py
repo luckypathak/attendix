@@ -1,5 +1,12 @@
 from rest_framework import serializers
-from .models import LeaveRequest, LeaveBalance, Holiday
+from .models import LeaveCategory, LeaveRequest, LeaveBalance, Holiday
+
+
+class LeaveCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeaveCategory
+        fields = '__all__'
+        read_only_fields = ('company',)
 
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
