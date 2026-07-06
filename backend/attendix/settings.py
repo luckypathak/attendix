@@ -82,8 +82,10 @@ ASGI_APPLICATION = 'attendix.asgi.application'
 
 # Database
 # Use DATABASE_URL if available (for Neon/Render production), fallback to SQLite for local development
+IS_PRODUCTION = os.getenv('RENDER') == 'true' or os.getenv('IS_PRODUCTION') == 'true'
 DATABASE_URL = os.getenv('DATABASE_URL')
-if DATABASE_URL:
+
+if IS_PRODUCTION and DATABASE_URL:
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
@@ -92,25 +94,12 @@ if DATABASE_URL:
         )
     }
 else:
-    DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.sqlite3')
-    if DB_ENGINE == 'django.db.backends.sqlite3':
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
-    else:
-        DATABASES = {
-            'default': {
-                'ENGINE': DB_ENGINE,
-                'NAME': os.getenv('DB_NAME', 'attendix_db'),
-                'USER': os.getenv('DB_USER', 'attendix_user'),
-                'PASSWORD': os.getenv('DB_PASSWORD', 'attendix_password'),
-                'HOST': os.getenv('DB_HOST', 'localhost'),
-                'PORT': os.getenv('DB_PORT', '5432'),
-            }
-        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

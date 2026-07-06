@@ -132,14 +132,10 @@ class Command(BaseCommand):
             )
             self.stdout.write('- Created Employee: john_dev / AdminPassword123!')
 
-        # 6. Create Leave Balances
-        for u in [hr_user, dev_user]:
-            for lt, _ in LeaveRequest.LEAVE_TYPES:
-                LeaveBalance.objects.get_or_create(
-                    employee=u,
-                    leave_type=lt,
-                    defaults={'allocated': 12, 'used': 0}
-                )
+        # 6. Create Default Categories
+        for cat_name in ['Casual Leave', 'Sick Leave', 'Paid Leave', 'Privilege Leave']:
+            from attendix.apps.leave.models import LeaveCategory
+            LeaveCategory.objects.get_or_create(company=company, name=cat_name)
 
         # 7. Create Holidays
         Holiday.objects.get_or_create(company=company, date=datetime.date(2026, 1, 1), defaults={'name': 'New Year\'s Day', 'is_paid': True})
