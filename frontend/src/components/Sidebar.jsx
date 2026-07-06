@@ -18,13 +18,13 @@ export default function Sidebar({ open, mobileOpen, handleDrawerToggle }) {
   const role = user?.role || 'EMPLOYEE';
 
   const menuItems = [
-    { text: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE'] },
+    { text: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
     { text: 'Employees', path: '/employees', icon: <Users size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'] },
-    { text: 'Attendance', path: '/attendance', icon: <CalendarRange size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE'] },
-    { text: 'Leaves', path: '/leaves', icon: <FileSpreadsheet size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE'] },
-    { text: 'Payroll', path: '/payroll', icon: <WalletCards size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE'] },
-    { text: 'Reimbursement', path: '/reimbursements', icon: <WalletCards size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE'] },
-    { text: 'Tasks', path: '/todos', icon: <CheckSquare size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER', 'EMPLOYEE'] },
+    { text: 'Attendance', path: '/attendance', icon: <CalendarRange size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
+    { text: 'Leaves', path: '/leaves', icon: <FileSpreadsheet size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
+    { text: 'Payroll', path: '/payroll', icon: <WalletCards size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
+    { text: 'Reimbursement', path: '/reimbursements', icon: <WalletCards size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
+    { text: 'Tasks', path: '/todos', icon: <CheckSquare size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
     { text: 'SMS Gateway', path: '/sms', icon: <MessageSquareShare size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
     { text: 'Audit Logs', path: '/audit', icon: <FileClock size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
     { text: 'Companies', path: '/companies', icon: <Landmark size={20} />, roles: ['SUPER_ADMIN'] },

@@ -355,8 +355,8 @@ export default function Employees() {
                   <TableCell sx={{ fontWeight: 700 }}>Shift timing</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>PF Deduction</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Base Salary (₹)</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Hourly Rate (₹)</TableCell>
+                  {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Base Salary (₹)</TableCell>}
+                  {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Hourly Rate (₹)</TableCell>}
                   {hasEditRights && <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>}
                 </TableRow>
               </TableHead>
@@ -419,8 +419,8 @@ export default function Employees() {
                           sx={{ fontWeight: 700, fontSize: '0.65rem' }}
                         />
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>₹{parseFloat(emp.base_salary).toLocaleString('en-IN')}</TableCell>
-                      <TableCell>₹{parseFloat(emp.hourly_rate).toFixed(2)}/hr</TableCell>
+                      {isAdmin && <TableCell sx={{ fontWeight: 600 }}>₹{parseFloat(emp.base_salary).toLocaleString('en-IN')}</TableCell>}
+                      {isAdmin && <TableCell>₹{parseFloat(emp.hourly_rate).toFixed(2)}/hr</TableCell>}
                       {hasEditRights && (
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -586,16 +586,18 @@ export default function Employees() {
                 </>
               )}
 
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Base Monthly Salary (₹)"
-                  type="number"
-                  value={baseSalary}
-                  onChange={(e) => setBaseSalary(e.target.value)}
-                  required
-                />
-              </Grid>
+              {isAdmin && (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Base Monthly Salary (₹)"
+                    type="number"
+                    value={baseSalary}
+                    onChange={(e) => setBaseSalary(e.target.value)}
+                    required
+                  />
+                </Grid>
+              )}
               
               <Grid item xs={12} sm={6}>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
