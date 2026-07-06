@@ -44,6 +44,7 @@ export default function Dashboard() {
   });
 
   const [loading, setLoading] = useState(true);
+  const [attendanceData, setAttendanceData] = useState(mockAttendanceData);
 
   useEffect(() => {
     fetchDashboardData();
@@ -56,6 +57,9 @@ export default function Dashboard() {
       const statsData = statsRes.data.stats;
       if (isAdmin) {
         setStats(statsData);
+        if (statsRes.data.trends) {
+          setAttendanceData(statsRes.data.trends);
+        }
         
         // Fetch real pending leaves & reimbursements
         const [leavesRes, reimbursementsRes] = await Promise.all([
@@ -206,7 +210,7 @@ export default function Dashboard() {
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>Attendance Trends</Typography>
                 <Box sx={{ width: '100%', height: 260 }}>
                   <ResponsiveContainer>
-                    <LineChart data={mockAttendanceData}>
+                    <LineChart data={attendanceData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="name" stroke="#6c757d" />
                       <YAxis stroke="#6c757d" />

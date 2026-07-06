@@ -94,6 +94,31 @@ class DashboardStatsView(APIView):
                 status='PENDING'
             ).count()
 
+            # Calculate real attendance trends for the last 7 days
+            import datetime
+            trends_data = []
+            for i in range(6, -1, -1):
+                date_point = today - datetime.timedelta(days=i)
+                day_name = date_point.strftime('%a')
+                
+                present_count = Attendance.objects.filter(
+                    employee__company=user.company,
+                    date=date_point,
+                    status__in=['PRESENT', 'LATE']
+                ).count()
+                
+                late_count = Attendance.objects.filter(
+                    employee__company=user.company,
+                    date=date_point,
+                    status='LATE'
+                ).count()
+                
+                trends_data.append({
+                    "name": day_name,
+                    "Present": present_count,
+                    "Late": late_count
+                })
+
             return Response({
                 "role": user.role,
                 "stats": {
@@ -101,7 +126,8 @@ class DashboardStatsView(APIView):
                     "checkedIn": checked_in,
                     "late": late,
                     "pendingLeaves": pending_leaves
-                }
+                },
+                "trends": trends_data
             })
         else:
             # Employee Dashboard Metrics
