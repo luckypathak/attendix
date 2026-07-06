@@ -28,3 +28,7 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://attendix-backend.onrender.com/api/v1
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: "/index.html"
