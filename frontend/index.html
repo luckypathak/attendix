@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attendix Workforce OS</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Prevent FOUC for dark mode -->
+    <meta name="color-scheme" content="light dark">
+    <script>
+      {
+        const colorScheme = localStorage.getItem("color-scheme") || "dark"; // Default to dark for premium look
+        document.documentElement.setAttribute("data-theme", colorScheme);
+        if (colorScheme === "dark") {
+          document.documentElement.style.backgroundColor = "#0a0915";
+          document.documentElement.style.color = "#f8f9fa";
+        } else {
+          document.documentElement.style.backgroundColor = "#f8f9fa";
+          document.documentElement.style.color = "#212529";
+        }
+      }
+    </script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

@@ -1,0 +1,157 @@
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from .models import EmployeeProfile
+from attendix.apps.company.models import Department, Designation, Firm
+
+User = get_user_model()
+
+
+class EmployeeProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeProfile
+        fields = '__all__'
+
+
+class EmployeeDetailsSerializer(serializers.ModelSerializer):
+    # Flat Representation
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    email = serializers.EmailField(source='user.email')
+    first_name = serializers.CharField(source='user.first_name', required=False, allow_blank=True)
+    last_name = serializers.CharField(source='user.last_name', required=False, allow_blank=True)
+    phone = serializers.CharField(source='user.phone', required=False, allow_blank=True)
+    role = serializers.CharField(source='user.role')
+    username = serializers.CharField(source='user.username')
+    password = serializers.CharField(source='user.password', write_only=True, required=False)
+    
+    # Nested dropdown IDs
+    department_id = serializers.IntegerField(source='department.id', required=False, allow_null=True)
+    designation_id = serializers.IntegerField(source='designation.id', required=False, allow_null=True)
+    manager_id = serializers.IntegerField(source='manager.id', required=False, allow_null=True)
+    
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    designation_name = serializers.CharField(source='designation.name', read_only=True)
+    manager_name = serializers.CharField(source='manager.username', read_only=True)
+
+    # Firms and Shifts
+    firm_id = serializers.IntegerField(required=False, allow_null=True)
+    firm_name = serializers.CharField(source='user.firm.name', read_only=True)
+    shift_id = serializers.IntegerField(required=False, allow_null=True)
+    shift_name = serializers.CharField(source='shift.name', read_only=True)
+
+    class Meta:
+        model = EmployeeProfile
+        fields = (
+            'id', 'user_id', 'username', 'email', 'first_name', 'last_name', 'phone', 'role',
+            'department_id', 'department_name', 'designation_id', 'designation_name',
+            'manager_id', 'manager_name', 'base_salary', 'hourly_rate', 'joining_date',
+            'pan_number', 'bank_account_no', 'bank_ifsc_code', 'created_at', 'updated_at',
+            'password', 'firm_id', 'firm_name', 'shift_id', 'shift_name', 'pf_deduction'
+        )
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['firm_id'] = instance.user.firm.id if (instance.user and instance.user.firm) else None
+        ret['shift_id'] = instance.shift.id if instance.shift else None
+        return ret
+
+    def create(self, validated_data):
+        user_data = validated_data.pop('user', {})
+        dept_data = validated_data.pop('department', {})
+        desg_data = validated_data.pop('designation', {})
+        mgr_data = validated_data.pop('manager', {})
+
+        firm_id = validated_data.pop('firm_id', None)
+        shift_id = validated_data.pop('shift_id', None)
+
+        # Resolve relations
+        from attendix.apps.company.models import Firm, Department, Designation
+        from attendix.apps.attendance.models import Shift
+
+        firm = Firm.objects.filter(id=firm_id).first() if firm_id else None
+        shift = Shift.objects.filter(id=shift_id).first() if shift_id else None
+
+        # Create user
+        password = user_data.get('password')
+        if not password:
+            password = User.objects.make_random_password()
+        user = User.objects.create_user(
+            username=user_data.get('username'),
+            email=user_data.get('email'),
+            password=password,
+            first_name=user_data.get('first_name', ''),
+            last_name=user_data.get('last_name', ''),
+            role=user_data.get('role', User.Roles.EMPLOYEE),
+            phone=user_data.get('phone', ''),
+            company=self.context['request'].user.company,
+            firm=firm
+        )
+
+        department = Department.objects.filter(id=dept_data.get('id')).first() if dept_data.get('id') else None
+        designation = Designation.objects.filter(id=desg_data.get('id')).first() if desg_data.get('id') else None
+        manager = User.objects.filter(id=mgr_data.get('id')).first() if mgr_data.get('id') else None
+
+        profile = EmployeeProfile.objects.create(
+            user=user,
+            department=department,
+            designation=designation,
+            manager=manager,
+            shift=shift,
+            **validated_data
+        )
+
+        # Initialize default leave balances for the new employee
+        try:
+            from attendix.apps.leave.models import LeaveBalance
+            for leave_type in ['CASUAL', 'SICK', 'PAID', 'UNPAID']:
+                default_allocated = 12 if leave_type == 'CASUAL' else (10 if leave_type == 'SICK' else (15 if leave_type == 'PAID' else 0))
+                LeaveBalance.objects.get_or_create(
+                    employee=user,
+                    leave_type=leave_type,
+                    defaults={'allocated': default_allocated, 'used': 0}
+                )
+        except Exception:
+            pass
+
+        return profile
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        dept_data = validated_data.pop('department', {})
+        desg_data = validated_data.pop('designation', {})
+        mgr_data = validated_data.pop('manager', {})
+
+        firm_id = validated_data.pop('firm_id', None)
+        shift_id = validated_data.pop('shift_id', None)
+
+        from attendix.apps.company.models import Firm, Department, Designation
+        from attendix.apps.attendance.models import Shift
+
+        # Update User fields
+        user = instance.user
+        password = user_data.pop('password', None)
+        if password:
+            user.set_password(password)
+        for attr, value in user_data.items():
+            setattr(user, attr, value)
+
+        if firm_id is not None:
+            user.firm = Firm.objects.filter(id=firm_id).first()
+        user.save()
+
+        # Update Relations
+        if 'id' in dept_data:
+            instance.department = Department.objects.filter(id=dept_data.get('id')).first()
+        if 'id' in desg_data:
+            instance.designation = Designation.objects.filter(id=desg_data.get('id')).first()
+        if 'id' in mgr_data:
+            instance.manager = User.objects.filter(id=mgr_data.get('id')).first()
+        
+        if shift_id is not None:
+            instance.shift = Shift.objects.filter(id=shift_id).first()
+
+        # Update Profile fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        return instance
