@@ -1,0 +1,30 @@
+services:
+  # 1. Django Backend Web Service
+  - type: web
+    name: attendix-backend
+    runtime: python
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate"
+    startCommand: "gunicorn attendix.wsgi:application --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_yNGsD6wpd7Fg@ep-flat-tree-at7ps4y8.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "*"
+      - key: CORS_ALLOW_ALL_ORIGINS
+        value: "True"
+
+  # 2. React Frontend Static Site
+  - type: web
+    name: attendix-frontend
+    runtime: static
+    buildCommand: "npm run build"
+    publishDir: "dist"
+    # Root directory for frontend
+    rootDir: "frontend"
+    envVars:
+      - key: VITE_API_URL
+        value: https://attendix-backend.onrender.com/api/v1

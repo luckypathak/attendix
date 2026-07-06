@@ -37,6 +37,8 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
     firm_name = serializers.CharField(source='user.firm.name', read_only=True)
     shift_id = serializers.IntegerField(required=False, allow_null=True)
     shift_name = serializers.CharField(source='shift.name', read_only=True)
+    shift_start_time = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    shift_end_time = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model = EmployeeProfile
@@ -45,13 +47,16 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
             'department_id', 'department_name', 'designation_id', 'designation_name',
             'manager_id', 'manager_name', 'base_salary', 'hourly_rate', 'joining_date',
             'pan_number', 'bank_account_no', 'bank_ifsc_code', 'created_at', 'updated_at',
-            'password', 'firm_id', 'firm_name', 'shift_id', 'shift_name', 'pf_deduction'
+            'password', 'firm_id', 'firm_name', 'shift_id', 'shift_name', 'pf_deduction',
+            'shift_start_time', 'shift_end_time'
         )
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         ret['firm_id'] = instance.user.firm.id if (instance.user and instance.user.firm) else None
         ret['shift_id'] = instance.shift.id if instance.shift else None
+        ret['shift_start_time'] = instance.shift.start_time.strftime('%H:%M') if (instance.shift and instance.shift.start_time) else None
+        ret['shift_end_time'] = instance.shift.end_time.strftime('%H:%M') if (instance.shift and instance.shift.end_time) else None
         return ret
 
     def create(self, validated_data):
@@ -62,13 +67,47 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
 
         firm_id = validated_data.pop('firm_id', None)
         shift_id = validated_data.pop('shift_id', None)
+        shift_start_str = validated_data.pop('shift_start_time', None)
+        shift_end_str = validated_data.pop('shift_end_time', None)
 
         # Resolve relations
         from attendix.apps.company.models import Firm, Department, Designation
         from attendix.apps.attendance.models import Shift
 
         firm = Firm.objects.filter(id=firm_id).first() if firm_id else None
-        shift = Shift.objects.filter(id=shift_id).first() if shift_id else None
+        
+        # Handle custom shift times
+        shift = None
+        if shift_start_str and shift_end_str:
+            import datetime
+            start_time = None
+            end_time = None
+            for fmt in ('%H:%M', '%H:%M:%S', '%I:%M %p', '%I:%M%p'):
+                try:
+                    start_time = datetime.datetime.strptime(shift_start_str.strip(), fmt).time()
+                    break
+                except ValueError:
+                    continue
+            for fmt in ('%H:%M', '%H:%M:%S', '%I:%M %p', '%I:%M%p'):
+                try:
+                    end_time = datetime.datetime.strptime(shift_end_str.strip(), fmt).time()
+                    break
+                except ValueError:
+                    continue
+            
+            if start_time and end_time:
+                company = self.context['request'].user.company
+                shift, _ = Shift.objects.get_or_create(
+                    company=company,
+                    start_time=start_time,
+                    end_time=end_time,
+                    defaults={
+                        'name': f"Custom Shift ({start_time.strftime('%I:%M %p')} - {end_time.strftime('%I:%M %p')})"
+                    }
+                )
+        
+        if not shift and shift_id:
+            shift = Shift.objects.filter(id=shift_id).first()
 
         # Create user
         password = user_data.get('password')
@@ -122,6 +161,8 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
 
         firm_id = validated_data.pop('firm_id', None)
         shift_id = validated_data.pop('shift_id', None)
+        shift_start_str = validated_data.pop('shift_start_time', None)
+        shift_end_str = validated_data.pop('shift_end_time', None)
 
         from attendix.apps.company.models import Firm, Department, Designation
         from attendix.apps.attendance.models import Shift
@@ -146,7 +187,39 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
         if 'id' in mgr_data:
             instance.manager = User.objects.filter(id=mgr_data.get('id')).first()
         
-        if shift_id is not None:
+        # Handle custom shift times
+        shift = None
+        if shift_start_str and shift_end_str:
+            import datetime
+            start_time = None
+            end_time = None
+            for fmt in ('%H:%M', '%H:%M:%S', '%I:%M %p', '%I:%M%p'):
+                try:
+                    start_time = datetime.datetime.strptime(shift_start_str.strip(), fmt).time()
+                    break
+                except ValueError:
+                    continue
+            for fmt in ('%H:%M', '%H:%M:%S', '%I:%M %p', '%I:%M%p'):
+                try:
+                    end_time = datetime.datetime.strptime(shift_end_str.strip(), fmt).time()
+                    break
+                except ValueError:
+                    continue
+            
+            if start_time and end_time:
+                company = self.context['request'].user.company
+                shift, _ = Shift.objects.get_or_create(
+                    company=company,
+                    start_time=start_time,
+                    end_time=end_time,
+                    defaults={
+                        'name': f"Custom Shift ({start_time.strftime('%I:%M %p')} - {end_time.strftime('%I:%M %p')})"
+                    }
+                )
+        
+        if shift:
+            instance.shift = shift
+        elif shift_id is not None:
             instance.shift = Shift.objects.filter(id=shift_id).first()
 
         # Update Profile fields

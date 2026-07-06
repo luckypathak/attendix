@@ -38,6 +38,8 @@ export default function Employees() {
   const [shiftId, setShiftId] = useState('');
   const [firmId, setFirmId] = useState('');
   const [pfDeduction, setPfDeduction] = useState(false);
+  const [shiftStartTime, setShiftStartTime] = useState('');
+  const [shiftEndTime, setShiftEndTime] = useState('');
 
   // Related dropdown collections
   const [shifts, setShifts] = useState([]);
@@ -113,9 +115,17 @@ export default function Employees() {
     setRole(emp.role);
     setBaseSalary(emp.base_salary);
     setJoiningDate(emp.joining_date);
-    setShiftId(emp.shift_id || '');
     setFirmId(emp.firm_id || '');
     setPfDeduction(emp.pf_deduction || false);
+    if (emp.shift_start_time && emp.shift_end_time) {
+      setShiftStartTime(emp.shift_start_time);
+      setShiftEndTime(emp.shift_end_time);
+      setShiftId('CUSTOM');
+    } else {
+      setShiftStartTime('');
+      setShiftEndTime('');
+      setShiftId(emp.shift_id || '');
+    }
     setOpenModal(true);
     setFormMessage(null);
   };
@@ -151,6 +161,8 @@ export default function Employees() {
     setShiftId('');
     setFirmId('');
     setPfDeduction(false);
+    setShiftStartTime('');
+    setShiftEndTime('');
   };
 
   const handleSubmit = async (e) => {
@@ -166,7 +178,9 @@ export default function Employees() {
       role,
       base_salary: parseFloat(baseSalary),
       joining_date: joiningDate,
-      shift_id: shiftId ? parseInt(shiftId) : null,
+      shift_id: (shiftId && shiftId !== 'CUSTOM') ? parseInt(shiftId) : null,
+      shift_start_time: shiftId === 'CUSTOM' ? shiftStartTime : null,
+      shift_end_time: shiftId === 'CUSTOM' ? shiftEndTime : null,
       firm_id: firmId ? parseInt(firmId) : null,
       pf_deduction: pfDeduction
     };
@@ -524,11 +538,39 @@ export default function Employees() {
                   onChange={(e) => setShiftId(e.target.value)}
                 >
                   <MenuItem value=""><em>None (Standard 8h)</em></MenuItem>
+                  <MenuItem value="CUSTOM"><em>Custom Shift (Enter manually)</em></MenuItem>
                   {shifts.map((s) => (
                     <MenuItem key={s.id} value={s.id}>{s.name} ({s.start_time.substring(0, 5)} - {s.end_time.substring(0, 5)})</MenuItem>
                   ))}
                 </TextField>
               </Grid>
+
+              {shiftId === 'CUSTOM' && (
+                <>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Shift Start Time"
+                      type="time"
+                      InputLabelProps={{ shrink: true }}
+                      value={shiftStartTime}
+                      onChange={(e) => setShiftStartTime(e.target.value)}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Shift End Time"
+                      type="time"
+                      InputLabelProps={{ shrink: true }}
+                      value={shiftEndTime}
+                      onChange={(e) => setShiftEndTime(e.target.value)}
+                      required
+                    />
+                  </Grid>
+                </>
+              )}
 
               <Grid item xs={12} sm={6}>
                 <TextField
