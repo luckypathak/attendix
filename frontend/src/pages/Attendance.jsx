@@ -3,7 +3,8 @@ import { useSelector } from 'react-redux';
 import { 
   Box, Card, CardContent, Grid, Button, Typography, 
   CircularProgress, Alert, Table, TableBody, TableCell, 
-  TableContainer, TableHead, TableRow, Paper, Chip 
+  TableContainer, TableHead, TableRow, Paper, Chip,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField
 } from '@mui/material';
 import { MapPin, ShieldAlert, CheckCircle, Clock } from 'lucide-react';
 import api from '../services/api';
@@ -23,12 +24,15 @@ export default function Attendance() {
   const [history, setHistory] = useState([]);
   const [adminRecords, setAdminRecords] = useState([]);
   const [overtimeRequests, setOvertimeRequests] = useState([]);
+  const [otModalOpen, setOtModalOpen] = useState(false);
+  const [selectedRecordForOt, setSelectedRecordForOt] = useState(null);
+  const [otHours, setOtHours] = useState('2.0');
 
   useEffect(() => {
     fetchHistory();
+    fetchOvertimeRequests();
     if (isAdmin) {
       fetchAdminRecords();
-      fetchOvertimeRequests();
     }
   }, [isAdmin]);
 
@@ -94,6 +98,27 @@ export default function Attendance() {
       setOvertimeRequests(response.data.results || response.data);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleOpenOtModal = (rec) => {
+    setSelectedRecordForOt(rec);
+    setOtHours('2.0');
+    setOtModalOpen(true);
+  };
+
+  const handleSubmitPreApprovedOt = async () => {
+    try {
+      await api.post(`/attendance/records/${selectedRecordForOt.id}/grant-ot/`, {
+        hours: parseFloat(otHours)
+      });
+      setOtModalOpen(false);
+      fetchAdminRecords();
+      fetchOvertimeRequests();
+      alert('Overtime pre-approved successfully!');
+    } catch (e) {
+      console.error(e);
+      alert('Failed to grant overtime. Make sure attendance record is active.');
     }
   };
 
@@ -352,12 +377,13 @@ export default function Attendance() {
                       <TableCell sx={{ fontWeight: 700 }}>Out</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Locations (In / Out)</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                      {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>}
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {(isAdmin ? adminRecords : history).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 6 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                        <TableCell colSpan={isAdmin ? 7 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                           No attendance logs available.
                         </TableCell>
                       </TableRow>
@@ -393,6 +419,18 @@ export default function Attendance() {
                               sx={{ fontWeight: 600, fontSize: '0.75rem' }}
                             />
                           </TableCell>
+                          {isAdmin && (
+                            <TableCell>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleOpenOtModal(rec)}
+                                sx={{ fontSize: '0.7rem', py: 0.5 }}
+                              >
+                                Pre-Approve OT
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                     )}
@@ -478,7 +516,85 @@ export default function Attendance() {
             </Card>
           </Grid>
         )}
+
+        {/* Overtime Status for Employees */}
+        {!isAdmin && (
+          <Grid item xs={12}>
+            <Card sx={{ border: (theme) => `1px solid ${theme.palette.divider}` }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>
+                  My Overtime Records
+                </Typography>
+                <TableContainer component={Paper} elevation={0}>
+                  <Table>
+                    <TableHead sx={{ bgcolor: 'background.neutral' }}>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Hours Pre-Approved</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Approved By</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {overtimeRequests.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                            No overtime logs recorded.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        overtimeRequests.map((ot) => (
+                          <TableRow key={ot.id} hover>
+                            <TableCell>{formatDate(ot.date)}</TableCell>
+                            <TableCell>{ot.hours} hours</TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={ot.status} 
+                                color={ot.status === 'APPROVED' ? 'success' : ot.status === 'REJECTED' ? 'error' : 'warning'} 
+                                size="small" 
+                                sx={{ fontWeight: 600 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {ot.approved_by_name || (ot.status === 'PENDING' ? 'Awaiting Approval' : 'System Auto')}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
       </Grid>
+
+      {/* Dialog for Admin to pre-approve overtime */}
+      <Dialog open={otModalOpen} onClose={() => setOtModalOpen(false)}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Pre-Approve Overtime</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            Pre-approve hours of overtime for <strong>{selectedRecordForOt?.employee_name}</strong> on date <strong>{selectedRecordForOt && formatDate(selectedRecordForOt.date)}</strong>.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Overtime Hours"
+            type="number"
+            value={otHours}
+            onChange={(e) => setOtHours(e.target.value)}
+            inputProps={{ step: 0.5, min: 0.5 }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOtModalOpen(false)} variant="outlined">
+            Cancel
+          </Button>
+          <Button onClick={handleSubmitPreApprovedOt} variant="contained" color="primary">
+            Pre-Approve
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

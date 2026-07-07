@@ -103,6 +103,31 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         ).order_by('-date')
         return Response(AttendanceSerializer(records, many=True).data)
 
+    @action(detail=True, methods=['post'], url_path='grant-ot')
+    def grant_ot(self, request, pk=None):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            return Response({"detail": "Only managers/admins can pre-approve overtime."}, status=status.HTTP_403_FORBIDDEN)
+        
+        attendance = self.get_object()
+        hours = request.data.get('hours', 2.0)
+        
+        try:
+            hours = float(hours)
+        except ValueError:
+            return Response({"detail": "Invalid hours value."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        ot, created = Overtime.objects.update_or_create(
+            employee=attendance.employee,
+            attendance=attendance,
+            date=attendance.date,
+            defaults={
+                'hours': hours,
+                'status': 'APPROVED',
+                'approved_by': request.user
+            }
+        )
+        return Response(OvertimeSerializer(ot).data, status=status.HTTP_200_OK)
+
 
 class OvertimeViewSet(viewsets.ModelViewSet):
     queryset = Overtime.objects.all()

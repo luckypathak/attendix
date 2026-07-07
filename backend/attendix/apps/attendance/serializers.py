@@ -28,6 +28,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
 
 class OvertimeSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.username', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.username', read_only=True, allow_null=True)
 
     class Meta:
         model = Overtime
