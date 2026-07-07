@@ -37,18 +37,37 @@ export default function Attendance() {
       const response = await api.get('/attendance/records/history/');
       setHistory(response.data);
       
-      const d = new Date();
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const todayStr = `${year}-${month}-${day}`;
-      
-      const todayRecord = response.data.find(rec => rec.date === todayStr);
-      if (todayRecord) {
-        setAttendanceToday(todayRecord);
-        if (todayRecord.check_in_time && !todayRecord.check_out_time) {
+      const getCheckInDateTime = (dateStr, timeStr) => {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        let hours = 9, minutes = 0;
+        if (match) {
+          hours = parseInt(match[1]);
+          minutes = parseInt(match[2]);
+          const ampm = match[3].toUpperCase();
+          if (ampm === 'PM' && hours < 12) hours += 12;
+          if (ampm === 'AM' && hours === 12) hours = 0;
+        } else {
+          const parts = timeStr.split(':');
+          if (parts.length >= 2) {
+            hours = parseInt(parts[0]);
+            minutes = parseInt(parts[1]);
+          }
+        }
+        return new Date(year, month - 1, day, hours, minutes);
+      };
+
+      const openRecord = response.data.find(rec => rec.check_in_time && !rec.check_out_time);
+      if (openRecord) {
+        const checkInDt = getCheckInDateTime(openRecord.date, openRecord.check_in_time);
+        const nowDt = new Date();
+        const elapsedHours = (nowDt - checkInDt) / (1000 * 60 * 60);
+        
+        if (elapsedHours < 20) {
+          setAttendanceToday(openRecord);
           setIsClockedIn(true);
         } else {
+          setAttendanceToday(null);
           setIsClockedIn(false);
         }
       } else {

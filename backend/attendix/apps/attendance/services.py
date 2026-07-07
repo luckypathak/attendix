@@ -33,6 +33,28 @@ class AttendanceService:
         today = now.date()
         time_now = now.time()
 
+        # Auto-checkout any open records from previous days
+        previous_open_records = Attendance.objects.filter(
+            employee=employee,
+            date__lt=today,
+            check_in_time__isnull=False,
+            check_out_time__isnull=True
+        )
+        for record in previous_open_records:
+            active_shift = record.shift or cls.get_active_shift(employee)
+            record.check_out_time = active_shift.end_time if active_shift else datetime.time(18, 0, 0)
+            record.check_out_address = "SYSTEM AUTO CHECKOUT (Forgot checkout)"
+            record.check_out_lat = record.check_in_lat
+            record.check_out_lng = record.check_in_lng
+            
+            # Half-day rule check for auto-closed records
+            chk_in_dt = datetime.datetime.combine(record.date, record.check_in_time)
+            chk_out_dt = datetime.datetime.combine(record.date, record.check_out_time)
+            hrs = (chk_out_dt - chk_in_dt).total_seconds() / 3600.0
+            if hrs < 6.0:
+                record.status = Attendance.Statuses.HALF_DAY
+            record.save()
+
         # Check if already checked in today
         attendance, created = Attendance.objects.get_or_create(
             employee=employee,
