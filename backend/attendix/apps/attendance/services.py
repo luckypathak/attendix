@@ -72,6 +72,14 @@ class AttendanceService:
             defaults={'status': Attendance.Statuses.PRESENT}
         )
 
+        # Clear checkout fields on check-in
+        attendance.check_out_time = None
+        attendance.check_out_lat = None
+        attendance.check_out_lng = None
+        attendance.check_out_accuracy = None
+        attendance.check_out_address = None
+        attendance.check_out_device_info = None
+
         shift = cls.get_active_shift(employee)
         if not shift:
             raise ValidationError("No active shift configured for your company. Contact administrator.")
@@ -115,6 +123,8 @@ class AttendanceService:
             attendance.check_in_device_info = device_info
             attendance.captured_image = captured_image
             attendance.status = status
+            attendance.save()
+        else:
             attendance.save()
 
         # Create new session record
