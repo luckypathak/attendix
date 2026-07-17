@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { 
   Grid, Card, CardContent, Typography, Box, Button, 
   Table, TableBody, TableCell, TableContainer, TableHead, 
@@ -24,6 +24,7 @@ const mockAttendanceData = [
 export default function Dashboard() {
   const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
+  const { selectedFirm } = useOutletContext();
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN' || user?.role === 'MANAGER';
   
   // Dashboard states
@@ -48,12 +49,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [isAdmin]);
+  }, [isAdmin, selectedFirm]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const statsRes = await api.get('/company/dashboard-stats/');
+      const statsRes = await api.get('/company/dashboard-stats/', { params: { firm: selectedFirm } });
       const statsData = statsRes.data.stats;
       if (isAdmin) {
         setStats(statsData);
@@ -63,8 +64,8 @@ export default function Dashboard() {
         
         // Fetch real pending leaves & reimbursements
         const [leavesRes, reimbursementsRes] = await Promise.all([
-          api.get('/leaves/requests/?status=PENDING'),
-          api.get('/reimbursements/?status=PENDING')
+          api.get('/leaves/requests/?status=PENDING', { params: { firm: selectedFirm } }),
+          api.get('/reimbursements/?status=PENDING', { params: { firm: selectedFirm } })
         ]);
         
         const pendingLeaves = (leavesRes.data.results || leavesRes.data).map(item => ({

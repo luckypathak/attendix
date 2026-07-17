@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useOutletContext } from 'react-router-dom';
 import { 
   Box, Card, CardContent, Grid, Button, Typography, 
   CircularProgress, Alert, Table, TableBody, TableCell, 
@@ -12,6 +13,7 @@ import { formatDate } from '../utils/format';
 
 export default function Attendance() {
   const { user } = useSelector((state) => state.auth);
+  const { selectedFirm } = useOutletContext();
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN' || user?.role === 'MANAGER';
   
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -40,7 +42,7 @@ export default function Attendance() {
     if (isAdmin) {
       fetchAdminRecords();
     }
-  }, [isAdmin]);
+  }, [isAdmin, selectedFirm]);
 
   const fetchHistory = async () => {
     try {
@@ -91,7 +93,7 @@ export default function Attendance() {
 
   const fetchAdminRecords = async () => {
     try {
-      const response = await api.get('/attendance/records/');
+      const response = await api.get('/attendance/records/', { params: { firm: selectedFirm } });
       setAdminRecords(response.data.results || response.data);
     } catch (e) {
       console.error(e);
@@ -100,7 +102,7 @@ export default function Attendance() {
 
   const fetchOvertimeRequests = async () => {
     try {
-      const response = await api.get('/attendance/overtime/');
+      const response = await api.get('/attendance/overtime/', { params: { firm: selectedFirm } });
       setOvertimeRequests(response.data.results || response.data);
     } catch (e) {
       console.error(e);

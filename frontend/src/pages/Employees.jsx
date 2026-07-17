@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useOutletContext } from 'react-router-dom';
 import { 
   Box, Card, CardContent, Grid, Button, Typography, 
   TextField, Table, TableBody, TableCell, TableContainer, 
@@ -16,6 +17,7 @@ import dayjs from 'dayjs';
 
 export default function Employees() {
   const { user } = useSelector((state) => state.auth);
+  const { selectedFirm } = useOutletContext();
   // Manager is only allowed to edit/process within their firm
   const isManager = user?.role === 'MANAGER';
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN';
@@ -76,13 +78,13 @@ export default function Employees() {
     fetchEmployees();
     fetchFirms();
     fetchShifts();
-  }, []);
+  }, [selectedFirm]);
 
   const fetchEmployees = async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await api.get('/employees/');
+      const res = await api.get('/employees/', { params: { firm: selectedFirm } });
       setEmployees(res.data.results || res.data);
     } catch (e) {
       setErrorMsg('Failed to load employee list. Please ensure backend is active.');

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useOutletContext } from 'react-router-dom';
 import { 
   Box, Card, CardContent, Grid, Button, Typography, 
   TextField, Table, TableBody, TableCell, TableContainer, 
@@ -12,6 +13,7 @@ import api from '../services/api';
 
 export default function Payroll() {
   const { user } = useSelector((state) => state.auth);
+  const { selectedFirm } = useOutletContext();
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN';
 
   // State
@@ -39,11 +41,11 @@ export default function Payroll() {
     if (isAdmin) {
       fetchEmployees();
     }
-  }, [isAdmin]);
+  }, [isAdmin, selectedFirm]);
 
   const fetchPayrolls = async () => {
     try {
-      const res = await api.get('/payroll/records/');
+      const res = await api.get('/payroll/records/', { params: { firm: selectedFirm } });
       setPayrolls(res.data.results || res.data);
     } catch (e) {
       console.error(e);
@@ -52,7 +54,7 @@ export default function Payroll() {
 
   const fetchAdvances = async () => {
     try {
-      const res = await api.get('/payroll/advances/');
+      const res = await api.get('/payroll/advances/', { params: { firm: selectedFirm } });
       setAdvances(res.data.results || res.data);
     } catch (e) {
       console.error(e);
@@ -61,7 +63,7 @@ export default function Payroll() {
 
   const fetchEmployees = async () => {
     try {
-      const res = await api.get('/employees/');
+      const res = await api.get('/employees/', { params: { firm: selectedFirm } });
       setEmployees(res.data.results || res.data);
     } catch (e) {
       console.error(e);

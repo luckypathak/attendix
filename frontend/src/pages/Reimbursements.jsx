@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useOutletContext } from 'react-router-dom';
 import { 
   Box, Card, CardContent, Grid, Button, Typography, 
   TextField, Table, TableBody, TableCell, TableContainer, 
@@ -11,6 +12,7 @@ import api from '../services/api';
 
 export default function Reimbursements() {
   const { user } = useSelector((state) => state.auth);
+  const { selectedFirm } = useOutletContext();
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN' || user?.role === 'MANAGER';
 
   // Forms states
@@ -30,11 +32,11 @@ export default function Reimbursements() {
 
   useEffect(() => {
     fetchClaims();
-  }, []);
+  }, [selectedFirm]);
 
   const fetchClaims = async () => {
     try {
-      const res = await api.get('/reimbursements/');
+      const res = await api.get('/reimbursements/', { params: { firm: selectedFirm } });
       setClaims(res.data.results || res.data);
     } catch (e) {
       console.error(e);

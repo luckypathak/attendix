@@ -15,15 +15,24 @@ class ReimbursementViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        base_qs = self.queryset
+        base_qs = self.queryset.filter(employee__is_deleted=False, employee__is_active=True)
         if user.role == 'SUPER_ADMIN':
+            firm_id = self.request.query_params.get('firm')
+            if firm_id and firm_id != 'ALL' and firm_id != 'undefined':
+                try:
+                    base_qs = base_qs.filter(employee__firm_id=int(firm_id))
+                except ValueError:
+                    pass
             return base_qs
         if user.role == 'MANAGER':
             return base_qs.filter(employee__company=user.company, employee__firm=user.firm)
         if user.role == 'COMPANY_ADMIN':
             firm_id = self.request.query_params.get('firm')
             if firm_id and firm_id != 'ALL' and firm_id != 'undefined':
-                return base_qs.filter(employee__company=user.company, employee__firm_id=firm_id)
+                try:
+                    return base_qs.filter(employee__company=user.company, employee__firm_id=int(firm_id))
+                except ValueError:
+                    pass
             return base_qs.filter(employee__company=user.company)
         return base_qs.filter(employee=user)
 

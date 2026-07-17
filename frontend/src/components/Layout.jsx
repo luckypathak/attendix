@@ -222,7 +222,7 @@ export default function Layout() {
           bgcolor: 'background.default',
         }}
       >
-        <Outlet />
+        <Outlet context={{ selectedFirm }} />
       </Box>
     </Box>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useOutletContext } from 'react-router-dom';
 import {
   Box, Card, CardContent, Grid, Button, Typography,
   TextField, MenuItem, Table, TableBody, TableCell,
@@ -16,6 +17,7 @@ import { formatDate } from '../utils/format';
 
 export default function AttendanceAnalytics() {
   const { user } = useSelector((state) => state.auth);
+  const { selectedFirm } = useOutletContext();
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -36,14 +38,18 @@ export default function AttendanceAnalytics() {
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null);
 
   useEffect(() => {
+    setSelectedBranch(selectedFirm);
     fetchFilterOptions();
+  }, [selectedFirm]);
+
+  useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [selectedBranch]);
 
   const fetchFilterOptions = async () => {
     try {
       const [empRes, branchRes] = await Promise.all([
-        api.get('/employees/'),
+        api.get('/employees/', { params: { firm: selectedFirm } }),
         api.get('/company/firms/')
       ]);
       setEmployees(empRes.data.results || empRes.data);

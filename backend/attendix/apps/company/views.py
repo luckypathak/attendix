@@ -72,27 +72,44 @@ class DashboardStatsView(APIView):
         today = timezone.localdate()
 
         if user.role in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            # Read firm parameter
+            firm_id = request.query_params.get('firm')
+            
+            # Setup base query dictionaries excluding deleted users
+            emp_q = {'user__is_deleted': False, 'user__is_active': True}
+            att_q = {'employee__is_deleted': False, 'employee__is_active': True, 'date': today}
+            leave_q = {'employee__is_deleted': False, 'employee__is_active': True, 'status': 'PENDING'}
+            
+            if user.role != 'SUPER_ADMIN':
+                emp_q['user__company'] = user.company
+                att_q['employee__company'] = user.company
+                leave_q['employee__company'] = user.company
+
+            if user.role == 'MANAGER':
+                emp_q['user__firm'] = user.firm
+                att_q['employee__firm'] = user.firm
+                leave_q['employee__firm'] = user.firm
+            elif firm_id and firm_id != 'ALL' and firm_id != 'undefined':
+                try:
+                    f_id = int(firm_id)
+                    emp_q['user__firm_id'] = f_id
+                    att_q['employee__firm_id'] = f_id
+                    leave_q['employee__firm_id'] = f_id
+                except ValueError:
+                    pass
+
             # Admin Dashboard Metrics
-            total_employees = EmployeeProfile.objects.filter(user__company=user.company).count()
+            total_employees = EmployeeProfile.objects.filter(**emp_q).count()
             
             # Real checked-in today count
-            checked_in = Attendance.objects.filter(
-                employee__company=user.company,
-                date=today
-            ).count()
+            checked_in = Attendance.objects.filter(**att_q).count()
             
             # Real late arrivals count today
-            late = Attendance.objects.filter(
-                employee__company=user.company,
-                date=today,
-                status='LATE'
-            ).count()
+            late_q = dict(att_q, status='LATE')
+            late = Attendance.objects.filter(**late_q).count()
             
             # Real pending leaves count
-            pending_leaves = LeaveRequest.objects.filter(
-                employee__company=user.company,
-                status='PENDING'
-            ).count()
+            pending_leaves = LeaveRequest.objects.filter(**leave_q).count()
 
             # Calculate real attendance trends for the last 7 days
             import datetime
@@ -101,16 +118,17 @@ class DashboardStatsView(APIView):
                 date_point = today - datetime.timedelta(days=i)
                 day_name = date_point.strftime('%a')
                 
+                trend_att_q = dict(att_q, date=date_point)
+                trend_att_q.pop('status', None)
+                
                 present_count = Attendance.objects.filter(
-                    employee__company=user.company,
-                    date=date_point,
-                    status__in=['PRESENT', 'LATE']
+                    status__in=['PRESENT', 'LATE'],
+                    **trend_att_q
                 ).count()
                 
                 late_count = Attendance.objects.filter(
-                    employee__company=user.company,
-                    date=date_point,
-                    status='LATE'
+                    status='LATE',
+                    **trend_att_q
                 ).count()
                 
                 trends_data.append({

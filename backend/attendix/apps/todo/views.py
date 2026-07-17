@@ -16,11 +16,28 @@ class TodoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        base_qs = self.queryset.filter(employee__is_deleted=False, employee__is_active=True)
         if user.role == 'SUPER_ADMIN':
-            return self.queryset
+            firm_id = self.request.query_params.get('firm')
+            if firm_id and firm_id != 'ALL' and firm_id != 'undefined':
+                try:
+                    base_qs = base_qs.filter(employee__firm_id=int(firm_id))
+                except ValueError:
+                    pass
+            return base_qs
         if user.role in ['COMPANY_ADMIN', 'MANAGER']:
-            return self.queryset.filter(employee__company=user.company)
-        return self.queryset.filter(employee=user)
+            qs = base_qs.filter(employee__company=user.company)
+            if user.role == 'MANAGER':
+                qs = qs.filter(employee__firm=user.firm)
+            else:
+                firm_id = self.request.query_params.get('firm')
+                if firm_id and firm_id != 'ALL' and firm_id != 'undefined':
+                    try:
+                        qs = qs.filter(employee__firm_id=int(firm_id))
+                    except ValueError:
+                        pass
+            return qs
+        return base_qs.filter(employee=user)
 
     def perform_create(self, serializer):
         # By default assign to current user

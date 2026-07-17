@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useOutletContext } from 'react-router-dom';
 import { 
   Box, Card, CardContent, Grid, Button, Typography, 
   TextField, Checkbox, FormControlLabel, List, ListItem, 
@@ -18,6 +19,7 @@ import { formatDate, formatDateTime } from '../utils/format';
 
 export default function Todos() {
   const { user } = useSelector((state) => state.auth);
+  const { selectedFirm } = useOutletContext();
   const isManagement = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN' || user?.role === 'MANAGER';
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN';
 
@@ -47,7 +49,7 @@ export default function Todos() {
 
   const fetchTodos = async () => {
     try {
-      const res = await api.get('/todos/');
+      const res = await api.get('/todos/', { params: { firm: selectedFirm } });
       setTodos(res.data.results || res.data);
     } catch (e) {
       console.error(e);
@@ -57,7 +59,7 @@ export default function Todos() {
   const fetchEmployees = async () => {
     if (!isManagement) return;
     try {
-      const res = await api.get('/employees/');
+      const res = await api.get('/employees/', { params: { firm: selectedFirm } });
       setEmployees(res.data.results || res.data);
     } catch (e) {
       console.error(e);
@@ -67,7 +69,7 @@ export default function Todos() {
   useEffect(() => {
     fetchTodos();
     fetchEmployees();
-  }, []);
+  }, [selectedFirm]);
 
   const handleCreateTodo = async (e) => {
     e.preventDefault();

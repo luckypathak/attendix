@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useOutletContext } from 'react-router-dom';
 import { 
   Box, Card, CardContent, Grid, Button, Typography, 
   TextField, MenuItem, Table, TableBody, TableCell, 
@@ -17,6 +18,7 @@ import { formatDate } from '../utils/format';
 
 export default function Leaves() {
   const { user } = useSelector((state) => state.auth);
+  const { selectedFirm } = useOutletContext();
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'COMPANY_ADMIN' || user?.role === 'MANAGER';
 
   // State collections
@@ -75,7 +77,7 @@ export default function Leaves() {
   const fetchAdminRequests = async () => {
     if (!isAdmin) return;
     try {
-      const res = await api.get('/leaves/requests/');
+      const res = await api.get('/leaves/requests/', { params: { firm: selectedFirm } });
       setAdminRequests(res.data.results || res.data);
     } catch (e) {
       console.error(e);
@@ -85,7 +87,7 @@ export default function Leaves() {
   const fetchEmployees = async () => {
     if (!isAdmin) return;
     try {
-      const res = await api.get('/employees/');
+      const res = await api.get('/employees/', { params: { firm: selectedFirm } });
       setEmployees(res.data.results || res.data);
     } catch (e) {
       console.error(e);
@@ -97,7 +99,7 @@ export default function Leaves() {
     fetchRequests();
     fetchAdminRequests();
     fetchEmployees();
-  }, []);
+  }, [selectedFirm]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -93,32 +93,36 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         from attendix.apps.reimbursement.models import Reimbursement
         from attendix.apps.todo.models import Todo
         from attendix.apps.employee.models import EmployeeFirmAllocation
+        from attendix.apps.notifications.models import Notification
         from django.contrib.auth import get_user_model
         
         User = get_user_model()
         users = User.objects.filter(id__in=user_ids)
+        from django.db import transaction
 
-        # Perform cascade deletion of all related objects
-        AttendanceSession.objects.filter(attendance__employee_id__in=user_ids).delete()
-        Attendance.objects.filter(employee_id__in=user_ids).delete()
-        Overtime.objects.filter(employee_id__in=user_ids).delete()
-        LeaveRequest.objects.filter(employee_id__in=user_ids).delete()
-        LeaveBalance.objects.filter(employee_id__in=user_ids).delete()
-        
-        PayrollBranchBreakdown.objects.filter(payroll__employee_id__in=user_ids).delete()
-        Payroll.objects.filter(employee_id__in=user_ids).delete()
-        AdvanceSalary.objects.filter(employee_id__in=user_ids).delete()
-        
-        Reimbursement.objects.filter(employee_id__in=user_ids).delete()
-        Todo.objects.filter(employee_id__in=user_ids).delete()
-        EmployeeFirmAllocation.objects.filter(employee_profile__id__in=employee_ids).delete()
+        with transaction.atomic():
+            # Perform cascade deletion of all related objects
+            AttendanceSession.objects.filter(attendance__employee_id__in=user_ids).delete()
+            Attendance.objects.filter(employee_id__in=user_ids).delete()
+            Overtime.objects.filter(employee_id__in=user_ids).delete()
+            LeaveRequest.objects.filter(employee_id__in=user_ids).delete()
+            LeaveBalance.objects.filter(employee_id__in=user_ids).delete()
+            
+            PayrollBranchBreakdown.objects.filter(payroll__employee_id__in=user_ids).delete()
+            Payroll.objects.filter(employee_id__in=user_ids).delete()
+            AdvanceSalary.objects.filter(employee_id__in=user_ids).delete()
+            
+            Reimbursement.objects.filter(employee_id__in=user_ids).delete()
+            Todo.objects.filter(employee_id__in=user_ids).delete()
+            EmployeeFirmAllocation.objects.filter(employee_profile__id__in=employee_ids).delete()
+            Notification.objects.filter(recipient_id__in=user_ids).delete()
 
-        # Delete Profiles
-        profiles.delete()
+            # Delete Profiles
+            profiles.delete()
 
-        # Soft-delete the User objects
-        for user in users:
-            user.delete()
+            # Soft-delete the User objects
+            for user in users:
+                user.delete()
 
         return Response({"detail": f"Successfully deleted {len(employee_ids)} employees and their related records."}, status=status.HTTP_200_OK)
 
@@ -131,22 +135,27 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             from attendix.apps.reimbursement.models import Reimbursement
             from attendix.apps.todo.models import Todo
             from attendix.apps.employee.models import EmployeeFirmAllocation
+            from attendix.apps.notifications.models import Notification
+            from django.db import transaction
             
-            AttendanceSession.objects.filter(attendance__employee_id=user_id).delete()
-            Attendance.objects.filter(employee_id=user_id).delete()
-            Overtime.objects.filter(employee_id=user_id).delete()
-            LeaveRequest.objects.filter(employee_id=user_id).delete()
-            LeaveBalance.objects.filter(employee_id=user_id).delete()
-            
-            PayrollBranchBreakdown.objects.filter(payroll__employee_id=user_id).delete()
-            Payroll.objects.filter(employee_id=user_id).delete()
-            AdvanceSalary.objects.filter(employee_id=user_id).delete()
-            
-            Reimbursement.objects.filter(employee_id=user_id).delete()
-            Todo.objects.filter(employee_id=user_id).delete()
-            EmployeeFirmAllocation.objects.filter(employee_profile=instance).delete()
-            
-            instance.user.delete()
-            
-        instance.delete()
+            with transaction.atomic():
+                AttendanceSession.objects.filter(attendance__employee_id=user_id).delete()
+                Attendance.objects.filter(employee_id=user_id).delete()
+                Overtime.objects.filter(employee_id=user_id).delete()
+                LeaveRequest.objects.filter(employee_id=user_id).delete()
+                LeaveBalance.objects.filter(employee_id=user_id).delete()
+                
+                PayrollBranchBreakdown.objects.filter(payroll__employee_id=user_id).delete()
+                Payroll.objects.filter(employee_id=user_id).delete()
+                AdvanceSalary.objects.filter(employee_id=user_id).delete()
+                
+                Reimbursement.objects.filter(employee_id=user_id).delete()
+                Todo.objects.filter(employee_id=user_id).delete()
+                EmployeeFirmAllocation.objects.filter(employee_profile=instance).delete()
+                Notification.objects.filter(recipient_id=user_id).delete()
+                
+                instance.user.delete()
+                instance.delete()
+        else:
+            instance.delete()
 
