@@ -117,7 +117,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             date__gte=start_of_month,
             date__lte=today
         ).order_by('-date')
-        return Response(AttendanceSerializer(records, many=True).data)
+        return Response(AttendanceSerializer(records, many=True, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='grant-ot')
     def grant_ot(self, request, pk=None):
