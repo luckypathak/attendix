@@ -61,6 +61,19 @@ class OvertimeSerializer(serializers.ModelSerializer):
         model = Overtime
         fields = '__all__'
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if instance.shift_start:
+            ret['shift_start'] = instance.shift_start.strftime('%I:%M %p')
+        if instance.shift_end:
+            ret['shift_end'] = instance.shift_end.strftime('%I:%M %p')
+        if instance.actual_current_time:
+            ret['actual_current_time'] = instance.actual_current_time.strftime('%I:%M %p')
+        from attendix.apps.attendance.services import AttendanceService
+        shift = instance.attendance.shift or AttendanceService.get_active_shift(instance.employee)
+        ret['shift_duration'] = f"{shift.duration_hours} hrs" if shift else "N/A"
+        return ret
+
 
 class CheckInSerializer(serializers.Serializer):
     latitude = serializers.FloatField()

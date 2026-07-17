@@ -133,9 +133,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         except ValueError:
             return Response({"detail": "Invalid hours value."}, status=status.HTTP_400_BAD_REQUEST)
         
+        session = attendance.sessions.order_by('-created_at').first()
+        
         ot, created = Overtime.objects.update_or_create(
             employee=attendance.employee,
             attendance=attendance,
+            session=session,
             date=attendance.date,
             defaults={
                 'hours': hours,
@@ -143,6 +146,18 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 'approved_by': request.user
             }
         )
+        if session:
+            session.ot_status = 'APPROVED'
+            session.ot_request_created = True
+            session.save()
+            
+            # Recalculate metrics on approval
+            from .services import AttendanceService
+            AttendanceService._recalculate_attendance_metrics(
+                attendance,
+                attendance.shift or AttendanceService.get_active_shift(attendance.employee),
+                attendance.date
+            )
         return Response(OvertimeSerializer(ot).data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='analytics')
@@ -287,6 +302,18 @@ class OvertimeViewSet(viewsets.ModelViewSet):
         ot.status = 'APPROVED'
         ot.approved_by = request.user
         ot.save()
+
+        session = ot.session
+        if session:
+            session.ot_status = 'APPROVED'
+            session.save()
+            # Recalculate metrics on approval (especially if already checked out)
+            from .services import AttendanceService
+            AttendanceService._recalculate_attendance_metrics(
+                session.attendance,
+                session.attendance.shift or AttendanceService.get_active_shift(ot.employee),
+                session.attendance.date
+            )
         return Response(OvertimeSerializer(ot).data)
 
     @action(detail=True, methods=['post'], url_path='reject')
@@ -296,6 +323,35 @@ class OvertimeViewSet(viewsets.ModelViewSet):
         
         ot = self.get_object()
         ot.status = 'REJECTED'
+        ot.hours = 0.0
         ot.approved_by = request.user
         ot.save()
+
+        session = ot.session
+        if session:
+            session.ot_status = 'REJECTED'
+            
+            # If still active, automatically check out employee
+            if not session.check_out_time:
+                from django.utils import timezone
+                tz = timezone.get_current_timezone()
+                now_dt = timezone.localtime(timezone.now())
+
+                session.check_out_time = now_dt.time()
+                session.auto_checkout = True
+                session.checkout_reason = 'AUTO_CHECKOUT'
+                session.save()
+
+                attendance = session.attendance
+                attendance.check_out_time = session.check_out_time
+                attendance.save()
+            else:
+                session.save()
+
+            from .services import AttendanceService
+            AttendanceService._recalculate_attendance_metrics(
+                session.attendance,
+                session.attendance.shift or AttendanceService.get_active_shift(ot.employee),
+                session.attendance.date
+            )
         return Response(OvertimeSerializer(ot).data)

@@ -192,6 +192,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'attendix.apps.attendance.tasks.cleanup_attendance_photos_task',
         'schedule': crontab(hour=0, minute=0),
     },
+    'check-active-overtimes': {
+        'task': 'attendix.apps.attendance.tasks.check_active_overtimes_task',
+        'schedule': crontab(minute='*'),
+    },
 }
 
 # SMS Gateway Config

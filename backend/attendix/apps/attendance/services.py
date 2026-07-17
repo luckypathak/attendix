@@ -187,20 +187,20 @@ class AttendanceService:
         return attendance
 
     @classmethod
+    @classmethod
     def _recalculate_attendance_metrics(cls, attendance, shift, current_date):
         # Calculate cumulative metrics across all completed sessions
-        total_worked_seconds = 0.0
         sessions = attendance.sessions.filter(check_out_time__isnull=False).order_by('check_in_time')
         
         if not sessions.exists():
             return
 
+        total_worked_seconds = 0.0
         first_session = sessions.first()
         last_session = sessions.last()
 
         for session in sessions:
             checkin_dt = datetime.datetime.combine(attendance.date, session.check_in_time)
-            # If check-out is before check-in, we assume overnight shift transition
             checkout_date = attendance.date
             if session.check_out_time < session.check_in_time:
                 checkout_date += datetime.timedelta(days=1)
@@ -222,8 +222,8 @@ class AttendanceService:
         attendance.break_hours = round(break_seconds / 3600.0, 2)
 
         # Half-day rule: If worked hours is less than shift duration (or 6.0 hrs fallback), downgrade status to HALF_DAY
-        half_day_threshold = float(shift.duration_hours) if shift else 6.0
-        if total_worked_hours < half_day_threshold:
+        shift_hours = float(shift.duration_hours) if shift else 9.0
+        if total_worked_hours < shift_hours:
             attendance.status = Attendance.Statuses.HALF_DAY
         else:
             # If they completed the full shift, restore status from HALF_DAY to PRESENT or LATE
@@ -244,72 +244,154 @@ class AttendanceService:
                 else:
                     attendance.status = Attendance.Statuses.PRESENT
 
-        # Overtime calculation based on worked hours vs shift duration
-        if shift:
-            shift_hours = shift.duration_hours
-            if total_worked_hours > shift_hours:
-                overtime_hours = round(float(total_worked_hours) - shift_hours, 2)
-                attendance.overtime_hours = overtime_hours
-                
-                if overtime_hours >= 0.5:
-                    Overtime.objects.update_or_create(
-                        employee=attendance.employee,
-                        attendance=attendance,
-                        date=attendance.date,
-                        defaults={
-                            'hours': overtime_hours,
-                            'status': 'PENDING'
-                        }
-                    )
-            else:
-                attendance.overtime_hours = 0.0
-                # Delete pending OT if it exists and no longer applies
-                Overtime.objects.filter(attendance=attendance, status='PENDING').delete()
+        # Calculate session-level regular and overtime hours
+        regular_accumulated = 0.0
+        approved_ot_total = 0.0
 
+        for session in sessions:
+            checkin_dt = datetime.datetime.combine(attendance.date, session.check_in_time)
+            checkout_date = attendance.date
+            if session.check_out_time < session.check_in_time:
+                checkout_date += datetime.timedelta(days=1)
+            checkout_dt = datetime.datetime.combine(checkout_date, session.check_out_time)
+            session_duration = round((checkout_dt - checkin_dt).total_seconds() / 3600.0, 2)
+
+            if regular_accumulated < shift_hours:
+                needed = round(shift_hours - regular_accumulated, 2)
+                if session_duration <= needed:
+                    session.regular_hours = session_duration
+                    session.ot_hours = 0.0
+                    regular_accumulated = round(regular_accumulated + session_duration, 2)
+                else:
+                    session.regular_hours = needed
+                    session.ot_hours = round(session_duration - needed, 2)
+                    regular_accumulated = shift_hours
+            else:
+                session.regular_hours = 0.0
+                session.ot_hours = session_duration
+
+            # If OT status is rejected or not approved, do not count the OT hours
+            if session.ot_status == 'REJECTED':
+                session.ot_hours = 0.0
+            
+            if session.ot_status == 'APPROVED':
+                approved_ot_total = round(approved_ot_total + float(session.ot_hours), 2)
+
+            session.save()
+
+            # Synchronize Overtime request hours if it exists
+            ot_req = getattr(session, 'overtime_request', None)
+            if ot_req:
+                if session.ot_status == 'REJECTED':
+                    ot_req.hours = 0.0
+                else:
+                    ot_req.hours = session.ot_hours
+                ot_req.save()
+
+        attendance.overtime_hours = approved_ot_total
         attendance.save()
+
+    @classmethod
+    def check_active_overtimes_and_autocheckout(cls):
+        """
+        Periodically checks active attendance sessions, detects if shift end has passed,
+        creates OT requests, and auto checks out employees when the grace period expires.
+        """
+        from django.utils import timezone
+        import datetime
+        from attendix.apps.attendance.models import Overtime
+
+        tz = timezone.get_current_timezone()
+        now_dt = timezone.localtime(timezone.now())
+
+        # Find all active sessions (where check_out_time is null)
+        active_sessions = AttendanceSession.objects.filter(check_out_time__isnull=True)
+
+        for session in active_sessions:
+            attendance = session.attendance
+            employee = attendance.employee
+            shift = attendance.shift or cls.get_active_shift(employee)
+            if not shift:
+                continue
+
+            # Calculate shift end datetime for the attendance date
+            shift_start = shift.start_time
+            shift_end = shift.end_time
+            shift_end_dt = datetime.datetime.combine(attendance.date, shift_end)
+            if shift_end < shift_start:
+                # overnight shift crosses midnight
+                shift_end_dt += datetime.timedelta(days=1)
+
+            # Make shift_end_dt aware in local timezone
+            shift_end_dt = timezone.make_aware(shift_end_dt, tz)
+
+            # 1. Check if shift end has passed
+            if now_dt >= shift_end_dt:
+                # Calculate running extra time
+                extra_working_time = round((now_dt - shift_end_dt).total_seconds() / 3600.0, 2)
+                if extra_working_time < 0.0:
+                    extra_working_time = 0.0
+
+                # Check if OT request already exists
+                ot_req = getattr(session, 'overtime_request', None)
+                if not ot_req:
+                    # Create a new Overtime request
+                    ot_req = Overtime.objects.create(
+                        employee=employee,
+                        attendance=attendance,
+                        session=session,
+                        date=attendance.date,
+                        hours=extra_working_time,
+                        status='PENDING',
+                        shift_start=shift_start,
+                        shift_end=shift_end,
+                        actual_current_time=now_dt.time(),
+                        extra_working_time=extra_working_time
+                    )
+                    session.ot_request_created = True
+                    session.ot_status = 'PENDING'
+                    session.save()
+                    print(f"Created pending OT request for {employee.username} on session {session.id}")
+                else:
+                    # If pending, update the running extra working hours
+                    if ot_req.status == 'PENDING':
+                        ot_req.hours = extra_working_time
+                        ot_req.extra_working_time = extra_working_time
+                        ot_req.actual_current_time = now_dt.time()
+                        ot_req.save()
+
+                # 2. Check if grace period has expired (Auto Checkout)
+                # If OT request is still PENDING after grace period, reject it and auto checkout
+                if session.ot_status == 'PENDING':
+                    grace_mins = shift.grace_period_minutes
+                    timeout_dt = shift_end_dt + datetime.timedelta(minutes=grace_mins)
+
+                    if now_dt > timeout_dt:
+                        print(f"Grace period expired for {employee.username}. Triggering auto-checkout.")
+                        # Reject OT Request
+                        ot_req.status = 'REJECTED'
+                        ot_req.hours = 0.0
+                        ot_req.save()
+
+                        # Auto checkout session
+                        session.check_out_time = timeout_dt.time()
+                        session.auto_checkout = True
+                        session.checkout_reason = 'AUTO_CHECKOUT'
+                        session.ot_status = 'REJECTED'
+                        session.save()
+
+                        # Update parent attendance
+                        attendance.check_out_time = session.check_out_time
+                        attendance.save()
+
+                        # Recalculate metrics
+                        cls._recalculate_attendance_metrics(attendance, shift, attendance.date)
 
     @classmethod
     def process_auto_checkout(cls):
         """
-        Runs via Celery beat. Auto check-out employees who forgot to check out
-        after shift completion + grace period (default 10 hours of shift).
+        Fallback compatibility wrapper calling the new check_active_overtimes_and_autocheckout logic.
         """
-        today = timezone.now().date()
-        # Find active sessions that do not have a check-out time
-        pending_sessions = AttendanceSession.objects.filter(
-            attendance__date=today,
-            check_out_time__isnull=True
-        )
+        cls.check_active_overtimes_and_autocheckout()
 
-        for session in pending_sessions:
-            record = session.attendance
-            company = record.employee.company
-            auto_checkout_hrs = float(company.auto_checkout_hours) if company else 10.0
-            
-            checkin_dt = datetime.datetime.combine(record.date, session.check_in_time)
-            now_dt = datetime.datetime.now()
-            
-            hours_elapsed = (now_dt - checkin_dt).total_seconds() / 3600.0
-            
-            if hours_elapsed >= auto_checkout_hrs:
-                # Check if there is an approved OT before auto-checking out
-                ot_request = Overtime.objects.filter(attendance=record).first()
-                if ot_request and ot_request.status == 'APPROVED':
-                    continue
-                
-                # Perform auto checkout
-                session.check_out_time = record.shift.end_time if record.shift else datetime.time(18, 0, 0)
-                session.check_out_address = "SYSTEM AUTO CHECKOUT (Forgotten checkout)"
-                session.check_out_lat = session.check_in_lat
-                session.check_out_lng = session.check_in_lng
-                session.save()
-                
-                record.check_out_time = session.check_out_time
-                record.check_out_address = session.check_out_address
-                record.check_out_lat = session.check_out_lat
-                record.check_out_lng = session.check_out_lng
-                record.save()
-                
-                active_shift = record.shift or cls.get_active_shift(record.employee)
-                cls._recalculate_attendance_metrics(record, active_shift, today)
 

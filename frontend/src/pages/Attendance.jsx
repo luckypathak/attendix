@@ -36,6 +36,7 @@ export default function Attendance() {
   const [previewImage, setPreviewImage] = useState(null);
   const [stream, setStream] = useState(null);
   const [cameraError, setCameraError] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
 
 
   useEffect(() => {
@@ -44,6 +45,16 @@ export default function Attendance() {
     if (isAdmin) {
       fetchAdminRecords();
     }
+
+    const interval = setInterval(() => {
+      fetchHistory();
+      fetchOvertimeRequests();
+      if (isAdmin) {
+        fetchAdminRecords();
+      }
+    }, 5000); // 5 seconds polling for real-time dashboard updates
+
+    return () => clearInterval(interval);
   }, [isAdmin, selectedFirm]);
 
   const fetchHistory = async () => {
@@ -67,12 +78,14 @@ export default function Attendance() {
 
       if (activeRec && activeSess) {
         setAttendanceToday(activeRec);
+        setActiveSession(activeSess);
         setIsClockedIn(true);
       } else {
         // If no active session, find if there is a record for today to show in summary
         const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
         const todayRec = response.data.find(rec => rec.date === todayStr);
         setAttendanceToday(todayRec || null);
+        setActiveSession(null);
         setIsClockedIn(false);
       }
     } catch (e) {
@@ -378,26 +391,36 @@ export default function Attendance() {
 
                 {/* Status Display */}
                 <Box sx={{ textAlign: 'center', mb: 4 }}>
-                  <Clock size={48} color={isClockedIn ? '#00f5d4' : '#6c757d'} style={{ margin: '0 auto 16px' }} />
+                  <Clock size={48} color={isClockedIn ? (activeSession?.ot_status === 'PENDING' ? '#ff9f1c' : '#00f5d4') : '#6c757d'} style={{ margin: '0 auto 16px' }} />
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    {isClockedIn ? 'Currently Clocked In' : 'Currently Clocked Out'}
+                    {isClockedIn ? (
+                      activeSession?.ot_status === 'PENDING' ? 'Waiting for OT Approval' : 'Currently Clocked In'
+                    ) : 'Currently Clocked Out'}
                   </Typography>
-                  {isClockedIn && attendanceToday && attendanceToday.sessions ? (() => {
-                    const activeSess = attendanceToday.sessions.find(s => !s.check_out_time);
-                    return activeSess ? (
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        Active Session Check-in: <strong>{activeSess.check_in_time}</strong>
+                  {isClockedIn && activeSession ? (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Active Session Check-in: <strong>{activeSession.check_in_time}</strong>
                       </Typography>
-                    ) : null;
-                  })() : null}
+                      {activeSession.ot_status === 'PENDING' && (
+                        <Chip label="OT Approval Pending" color="warning" size="small" sx={{ mt: 1, fontWeight: 700 }} />
+                      )}
+                      {activeSession.ot_status === 'APPROVED' && (
+                        <Chip label="OT Approved" color="success" size="small" sx={{ mt: 1, fontWeight: 700 }} />
+                      )}
+                    </Box>
+                  ) : null}
                   {!isClockedIn && attendanceToday && attendanceToday.sessions && attendanceToday.sessions.length > 0 ? (() => {
                     const lastSess = attendanceToday.sessions[attendanceToday.sessions.length - 1];
                     return (
                       <Box sx={{ mt: 1 }}>
                         {lastSess.check_out_time && (
                           <Typography variant="body2" color="text.secondary">
-                            Last Clock-out: <strong>{lastSess.check_out_time}</strong>
+                            Last Clock-out: <strong>{lastSess.check_out_time}</strong> {lastSess.checkout_reason === 'AUTO_CHECKOUT' && "(Auto Checked Out)"}
                           </Typography>
+                        )}
+                        {lastSess.checkout_reason === 'AUTO_CHECKOUT' && (
+                          <Chip label="Auto Checked Out" color="error" size="small" sx={{ mt: 1, fontWeight: 700 }} />
                         )}
                         <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600, color: 'primary.main' }}>
                           Today's Total: {attendanceToday.total_worked_hours || '0.00'} Hours
@@ -436,14 +459,14 @@ export default function Attendance() {
                   {isClockedIn ? (
                     <Button
                       variant="contained"
-                      color="secondary"
+                      color={activeSession?.ot_status === 'PENDING' ? 'warning' : 'secondary'}
                       fullWidth
                       size="large"
-                      disabled={!gpsData}
+                      disabled={!gpsData || activeSession?.ot_status === 'PENDING'}
                       onClick={handleClockOut}
                       sx={{ py: 1.5 }}
                     >
-                      Clock Out
+                      {activeSession?.ot_status === 'PENDING' ? 'Waiting for OT Approval' : 'Clock Out'}
                     </Button>
                   ) : (
                     <Button
@@ -634,7 +657,9 @@ export default function Attendance() {
                       <TableRow>
                         <TableCell sx={{ fontWeight: 700 }}>Employee</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>Hours Calculated</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Shift</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Worked Hours</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Current OT</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
                       </TableRow>
@@ -642,7 +667,7 @@ export default function Attendance() {
                     <TableBody>
                       {overtimeRequests.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                          <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                             No overtime requests found.
                           </TableCell>
                         </TableRow>
@@ -651,7 +676,21 @@ export default function Attendance() {
                           <TableRow key={ot.id} hover>
                             <TableCell sx={{ fontWeight: 600 }}>{ot.employee_name}</TableCell>
                             <TableCell>{formatDate(ot.date)}</TableCell>
-                            <TableCell>{ot.hours} hours</TableCell>
+                            <TableCell>
+                              {ot.shift_start && ot.shift_end ? (
+                                `${ot.shift_start} - ${ot.shift_end} (${ot.shift_duration})`
+                              ) : (
+                                'N/A'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {ot.shift_duration && ot.shift_duration !== 'N/A' ? (
+                                `${(parseFloat(ot.shift_duration) + parseFloat(ot.hours || 0)).toFixed(2)} hrs`
+                              ) : (
+                                `${parseFloat(ot.hours || 0).toFixed(2)} hrs`
+                              )}
+                            </TableCell>
+                            <TableCell>{ot.hours} hrs</TableCell>
                             <TableCell>
                               <Chip 
                                 label={ot.status} 
@@ -681,7 +720,9 @@ export default function Attendance() {
                                   </Button>
                                 </Box>
                               ) : (
-                                <Typography variant="body2" color="text.secondary">Processed</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  Processed by {ot.approved_by_name || 'System'}
+                                </Typography>
                               )}
                             </TableCell>
                           </TableRow>

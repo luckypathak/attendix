@@ -92,13 +92,20 @@ class Overtime(SoftDeleteModel):
         on_delete=models.CASCADE,
         related_name='overtime_records'
     )
-    attendance = models.OneToOneField(
+    attendance = models.ForeignKey(
         Attendance,
         on_delete=models.CASCADE,
-        related_name='overtime'
+        related_name='overtime_requests'
+    )
+    session = models.OneToOneField(
+        'AttendanceSession',
+        on_delete=models.CASCADE,
+        related_name='overtime_request',
+        null=True,
+        blank=True
     )
     date = models.DateField()
-    hours = models.DecimalField(max_digits=4, decimal_places=2)
+    hours = models.DecimalField(max_digits=6, decimal_places=2)
     status = models.CharField(
         max_length=20,
         choices=[
@@ -108,6 +115,10 @@ class Overtime(SoftDeleteModel):
         ],
         default='PENDING'
     )
+    shift_start = models.TimeField(null=True, blank=True)
+    shift_end = models.TimeField(null=True, blank=True)
+    actual_current_time = models.TimeField(null=True, blank=True)
+    extra_working_time = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -133,6 +144,23 @@ class AttendanceSession(SoftDeleteModel):
     captured_image = models.ImageField(upload_to='attendance_photos/', null=True, blank=True)
     check_out_captured_image = models.ImageField(upload_to='attendance_photos/', null=True, blank=True)
     
+    # Overtime & Auto Checkout fields
+    ot_request_created = models.BooleanField(default=False)
+    ot_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('PENDING', 'Pending Approval'),
+            ('APPROVED', 'Approved'),
+            ('REJECTED', 'Rejected')
+        ],
+        null=True,
+        blank=True
+    )
+    auto_checkout = models.BooleanField(default=False)
+    checkout_reason = models.CharField(max_length=100, null=True, blank=True)
+    regular_hours = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
+    ot_hours = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
+
     # Check-in GPS
     check_in_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     check_in_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)

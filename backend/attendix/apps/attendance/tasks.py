@@ -42,3 +42,13 @@ def cleanup_attendance_photos_task():
     msg = f"Cleanup completed. Deleted {parent_count} parent photos, {session_in_count} session check-in photos, {session_out_count} session check-out photos."
     logger.info(msg)
     return msg
+
+
+@shared_task
+def check_active_overtimes_task():
+    logger.info("Starting active overtime and auto checkout background task.")
+    from attendix.apps.attendance.services import AttendanceService
+    AttendanceService.check_active_overtimes_and_autocheckout()
+    logger.info("Active overtime and auto checkout check completed.")
+    return "Check completed."
+
