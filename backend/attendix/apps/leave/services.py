@@ -20,7 +20,7 @@ class LeaveService:
 
         # Calculate days requested
         leave_days = cls.calculate_work_days(leave_request.start_date, leave_request.end_date)
-        num_days = len(leave_days)
+        num_days = float(leave_request.get_leave_duration_days())
 
         # Deduct balance from EmployeeProfile if it is approved as a paid leave
         profile = leave_request.employee.employee_profile
@@ -28,7 +28,7 @@ class LeaveService:
             remaining = profile.allowed_leaves - profile.used_leaves
             if remaining < num_days:
                 raise ValidationError(f"Insufficient leave balance. Remaining: {remaining}, Requested: {num_days}")
-            profile.used_leaves += num_days
+            profile.used_leaves = float(profile.used_leaves) + num_days
             profile.save()
 
         # Update request
@@ -72,12 +72,12 @@ class LeaveService:
         if leave_request.status == 'APPROVED':
             # Calculate days requested
             leave_days = cls.calculate_work_days(leave_request.start_date, leave_request.end_date)
-            num_days = len(leave_days)
+            num_days = float(leave_request.get_leave_duration_days())
 
             # Restore balance in EmployeeProfile if it was a paid leave
             if leave_request.is_paid:
                 profile = leave_request.employee.employee_profile
-                profile.used_leaves = max(0, profile.used_leaves - num_days)
+                profile.used_leaves = max(0.0, float(profile.used_leaves) - num_days)
                 profile.save()
 
             # Delete the attendance records that were marked as LEAVE for these dates

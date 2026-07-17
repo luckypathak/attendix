@@ -93,3 +93,30 @@ class Payroll(SoftDeleteModel):
 
     def __str__(self):
         return f"{self.employee.username} - {self.month}/{self.year} - Net: {self.net_salary}"
+
+
+class PayrollBranchBreakdown(SoftDeleteModel):
+    payroll = models.ForeignKey(
+        Payroll,
+        on_delete=models.CASCADE,
+        related_name='branch_distributions'
+    )
+    firm = models.ForeignKey(
+        'company.Firm',
+        on_delete=models.CASCADE,
+        related_name='payroll_distributions'
+    )
+    base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    pf_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    net_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('payroll', 'firm')
+
+    def __str__(self):
+        return f"Payroll Split for {self.payroll.employee.username} at {self.firm.name} ({self.payroll.month}/{self.payroll.year})"
+

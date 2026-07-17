@@ -45,6 +45,10 @@ export default function Employees() {
   const [shiftStartTime, setShiftStartTime] = useState('');
   const [shiftEndTime, setShiftEndTime] = useState('');
   const [allowedLeaves, setAllowedLeaves] = useState('12');
+  const [pfType, setPfType] = useState('disabled');
+  const [pfValue, setPfValue] = useState('');
+  const [allocations, setAllocations] = useState([]);
+
 
   // Related dropdown collections
   const [shifts, setShifts] = useState([]);
@@ -124,8 +128,11 @@ export default function Employees() {
     setBaseSalary(emp.base_salary);
     setJoiningDate(emp.joining_date);
     setFirmId(emp.firm_id || '');
-    setAllowedLeaves(emp.allowed_leaves || '12');
+    setAllowedLeaves(emp.allowed_leaves !== null && emp.allowed_leaves !== undefined ? String(emp.allowed_leaves) : '12');
     setPfDeduction(emp.pf_deduction || false);
+    setPfType(emp.pf_type || 'disabled');
+    setPfValue(emp.pf_value || '');
+    setAllocations(emp.firm_allocations || []);
     if (emp.shift_start_time && emp.shift_end_time) {
       setShiftStartTime(emp.shift_start_time);
       setShiftEndTime(emp.shift_end_time);
@@ -171,6 +178,9 @@ export default function Employees() {
     setFirmId(isManager ? (user?.firm_id || user?.firm || '') : '');
     setAllowedLeaves('12');
     setPfDeduction(false);
+    setPfType('disabled');
+    setPfValue('');
+    setAllocations([]);
     setShiftStartTime('');
     setShiftEndTime('');
   };
@@ -192,8 +202,16 @@ export default function Employees() {
       shift_start_time: shiftId === 'CUSTOM' ? shiftStartTime : null,
       shift_end_time: shiftId === 'CUSTOM' ? shiftEndTime : null,
       firm_id: firmId ? parseInt(firmId) : null,
-      pf_deduction: pfDeduction,
-      allowed_leaves: parseInt(allowedLeaves, 10) || 12
+      pf_deduction: pfType !== 'disabled',
+      pf_type: pfType,
+      pf_value: pfType !== 'disabled' && pfValue !== '' ? parseFloat(pfValue) : 0.0,
+      firm_allocations: allocations.map(a => ({
+        firm: a.firm,
+        base_salary: parseFloat(a.base_salary) || 0.0,
+        pf_type: a.pf_type,
+        pf_value: parseFloat(a.pf_value) || 0.0
+      })),
+      allowed_leaves: (allowedLeaves !== '' && !isNaN(parseInt(allowedLeaves, 10))) ? parseInt(allowedLeaves, 10) : 12
     };
 
     if (password) {
@@ -622,20 +640,130 @@ export default function Employees() {
                 </Grid>
               )}
 
-              {/* PF Deduction check */}
+              {/* PF Configuration */}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  select
+                  fullWidth
+                  label="PF Calculation Type"
+                  value={pfType}
+                  onChange={(e) => setPfType(e.target.value)}
+                >
+                  <MenuItem value="disabled">Disabled</MenuItem>
+                  <MenuItem value="flat">Flat Amount</MenuItem>
+                  <MenuItem value="percentage">Percentage</MenuItem>
+                </TextField>
+              </Grid>
+
+              {pfType !== 'disabled' && (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    type="number"
+                    fullWidth
+                    label={pfType === 'flat' ? "PF Flat Amount (₹)" : "PF Percentage (%)"}
+                    value={pfValue}
+                    onChange={(e) => setPfValue(e.target.value)}
+                  />
+                </Grid>
+              )}
+
+              {/* Branch Allocations Section */}
               <Grid item xs={12}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={pfDeduction}
-                      onChange={(e) => setPfDeduction(e.target.checked)}
-                      color="primary"
-                    />
-                  }
-                  label="Deduct Provident Fund (PF) (12% of basic salary)"
-                />
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 700, mb: 1 }}>
+                  Branch-wise Salary Allocation / Splits
+                </Typography>
+                
+                {allocations.map((alloc, idx) => {
+                  const firmName = firms.find(f => f.id === alloc.firm)?.name || 'Default';
+                  return (
+                    <Box key={idx} sx={{ p: 2, mb: 2, border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                      <Typography sx={{ minWidth: 120, fontWeight: 600, fontSize: '0.85rem' }}>{firmName}</Typography>
+                      
+                      <TextField
+                        type="number"
+                        label="Base Salary"
+                        size="small"
+                        value={alloc.base_salary}
+                        onChange={(e) => {
+                          const updated = [...allocations];
+                          updated[idx].base_salary = parseFloat(e.target.value) || 0;
+                          setAllocations(updated);
+                        }}
+                        sx={{ width: 130 }}
+                      />
+
+                      <TextField
+                        select
+                        label="PF Type"
+                        size="small"
+                        value={alloc.pf_type}
+                        onChange={(e) => {
+                          const updated = [...allocations];
+                          updated[idx].pf_type = e.target.value;
+                          setAllocations(updated);
+                        }}
+                        sx={{ width: 120 }}
+                      >
+                        <MenuItem value="disabled">Disabled</MenuItem>
+                        <MenuItem value="flat">Flat Amount</MenuItem>
+                        <MenuItem value="percentage">Percentage</MenuItem>
+                      </TextField>
+
+                      {alloc.pf_type !== 'disabled' && (
+                        <TextField
+                          type="number"
+                          label="PF Value"
+                          size="small"
+                          value={alloc.pf_value}
+                          onChange={(e) => {
+                            const updated = [...allocations];
+                            updated[idx].pf_value = parseFloat(e.target.value) || 0;
+                            setAllocations(updated);
+                          }}
+                          sx={{ width: 100 }}
+                        />
+                      )}
+
+                      <Button
+                        color="error"
+                        size="small"
+                        onClick={() => {
+                          setAllocations(allocations.filter((_, i) => i !== idx));
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </Box>
+                  );
+                })}
+
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', mt: 2 }}>
+                  <TextField
+                    select
+                    label="Add to Branch"
+                    size="small"
+                    value=""
+                    onChange={(e) => {
+                      const fId = parseInt(e.target.value);
+                      if (!allocations.find(a => a.firm === fId)) {
+                        setAllocations([...allocations, { firm: fId, base_salary: 0, pf_type: 'disabled', pf_value: 0 }]);
+                      }
+                    }}
+                    sx={{ minWidth: 200 }}
+                  >
+                    <MenuItem value="" disabled>Select Branch...</MenuItem>
+                    {firms.map(f => (
+                      <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>
+                    ))}
+                  </TextField>
+                  <Typography variant="caption" color="text.secondary">
+                    Add branch splits if employee splits shifts or duties.
+                  </Typography>
+                </Box>
               </Grid>
             </Grid>
+
           </DialogContent>
           <DialogActions sx={{ p: 3 }}>
             <Button onClick={handleCloseModal} variant="outlined" disabled={formLoading}>

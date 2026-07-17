@@ -30,6 +30,8 @@ export default function Leaves() {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [reason, setReason] = useState('');
+  const [durationType, setDurationType] = useState('full_day');
+  const [customHours, setCustomHours] = useState('');
   const [formLoading, setFormLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -106,12 +108,16 @@ export default function Leaves() {
         leave_type: leaveType || 'General Leave',
         start_date: startDate ? startDate.format('YYYY-MM-DD') : '',
         end_date: endDate ? endDate.format('YYYY-MM-DD') : '',
-        reason: reason
+        reason: reason,
+        duration_type: durationType,
+        custom_hours: durationType === 'custom_hours' ? parseFloat(customHours) : null
       });
       setMessage({ type: 'success', text: 'Leave request submitted successfully!' });
       setStartDate(null);
       setEndDate(null);
       setReason('');
+      setDurationType('full_day');
+      setCustomHours('');
       fetchRequests();
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to submit leave request.' });
@@ -254,7 +260,7 @@ export default function Leaves() {
                   Allowed Leaves (Yearly)
                 </Typography>
                 <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>
-                  {user?.allowed_leaves || 12} <Typography component="span" variant="caption" color="text.secondary">days</Typography>
+                  {user?.allowed_leaves !== null && user?.allowed_leaves !== undefined ? user.allowed_leaves : 12} <Typography component="span" variant="caption" color="text.secondary">days</Typography>
                 </Typography>
               </CardContent>
             </Card>
@@ -278,7 +284,7 @@ export default function Leaves() {
                   Remaining Balance
                 </Typography>
                 <Typography variant="h4" sx={{ fontWeight: 800, mt: 1, color: '#9d4edd' }}>
-                  {Math.max(0, (user?.allowed_leaves || 12) - (user?.used_leaves || 0))} <Typography component="span" variant="caption" color="text.secondary">days</Typography>
+                  {Math.max(0, (user?.allowed_leaves !== null && user?.allowed_leaves !== undefined ? user.allowed_leaves : 12) - (user?.used_leaves || 0))} <Typography component="span" variant="caption" color="text.secondary">days</Typography>
                 </Typography>
               </CardContent>
             </Card>
@@ -337,6 +343,33 @@ export default function Leaves() {
                     </Box>
 
                     <TextField
+                      select
+                      fullWidth
+                      label="Duration Type"
+                      value={durationType}
+                      onChange={(e) => setDurationType(e.target.value)}
+                      sx={{ mb: 2.5 }}
+                    >
+                      <MenuItem value="full_day">Full Day</MenuItem>
+                      <MenuItem value="half_day">Half Day</MenuItem>
+                      <MenuItem value="custom_hours">Custom Hours</MenuItem>
+                    </TextField>
+
+                    {durationType === 'custom_hours' && (
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Custom Hours"
+                        value={customHours}
+                        onChange={(e) => setCustomHours(e.target.value)}
+                        sx={{ mb: 2.5 }}
+                        required
+                        inputProps={{ step: 0.5, min: 0.5 }}
+                      />
+                    )}
+
+                    <TextField
+
                       fullWidth
                       multiline
                       rows={3}
@@ -394,7 +427,14 @@ export default function Leaves() {
                         <TableRow key={req.id} hover>
                           {isAdmin && <TableCell sx={{ fontWeight: 600 }}>{req.employee_name}</TableCell>}
                           <TableCell>{req.leave_type}</TableCell>
-                          <TableCell>{formatDate(req.start_date)} to {formatDate(req.end_date)}</TableCell>
+                          <TableCell>
+                            <div>{formatDate(req.start_date)} to {formatDate(req.end_date)}</div>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                              {req.duration_type === 'full_day' && 'Full Day'}
+                              {req.duration_type === 'half_day' && 'Half Day'}
+                              {req.duration_type === 'custom_hours' && `Custom Hours (${req.custom_hours} hrs)`}
+                            </Typography>
+                          </TableCell>
                           <TableCell>{getStatusChip(req)}</TableCell>
                           {isAdmin && (
                             <TableCell>

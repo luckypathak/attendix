@@ -33,6 +33,18 @@ class LeaveRequest(SoftDeleteModel):
     is_paid = models.BooleanField(default=True) # Decided by admin during approval
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     reason = models.TextField()
+    
+    duration_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('full_day', 'Full Day'),
+            ('half_day', 'Half Day'),
+            ('custom_hours', 'Custom Hours')
+        ],
+        default='full_day'
+    )
+    custom_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+
     manager_comments = models.TextField(blank=True, null=True)
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -45,8 +57,34 @@ class LeaveRequest(SoftDeleteModel):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def get_leave_duration_days(self):
+        delta = self.end_date - self.start_date
+        num_dates = float(delta.days + 1)
+
+        if self.duration_type == 'full_day':
+            return num_dates
+        elif self.duration_type == 'half_day':
+            return 0.5 * num_dates
+        elif self.duration_type == 'custom_hours':
+            if not self.custom_hours:
+                return num_dates
+            
+            profile = getattr(self.employee, 'employee_profile', None)
+            shift_hours = 8.0
+            if profile and profile.shift:
+                shift_hours = float(profile.shift.duration_hours)
+            
+            if shift_hours == 5.0:
+                eq = 0.5 if float(self.custom_hours) < 2.0 else 1.0
+            else:
+                eq = 0.5 if float(self.custom_hours) < 5.0 else 1.0
+            
+            return eq * num_dates
+        return num_dates
+
     def __str__(self):
         return f"{self.employee.username} - {self.leave_type} ({self.start_date} to {self.end_date})"
+
 
 
 class LeaveBalance(SoftDeleteModel):

@@ -28,6 +28,12 @@ export default function Attendance() {
   const [selectedRecordForOt, setSelectedRecordForOt] = useState(null);
   const [otHours, setOtHours] = useState('2.0');
 
+  // Camera states
+  const [openCameraModal, setOpenCameraModal] = useState(false);
+  const [stream, setStream] = useState(null);
+  const [cameraError, setCameraError] = useState(null);
+
+
   useEffect(() => {
     fetchHistory();
     fetchOvertimeRequests();
@@ -202,15 +208,79 @@ export default function Attendance() {
     return err.message || defaultMsg;
   };
 
-  const handleClockIn = async () => {
-    if (!gpsData) return;
+  const startCamera = async () => {
+    setCameraError(null);
     try {
-      const response = await api.post('/attendance/records/check-in/', {
-        latitude: gpsData.latitude,
-        longitude: gpsData.longitude,
-        accuracy: gpsData.accuracy,
-        address: address,
-        device_info: `Web Browser (${navigator.userAgent.substring(0, 50)})`
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' }
+      });
+      setStream(mediaStream);
+      setTimeout(() => {
+        const videoElement = document.getElementById('webcam-preview');
+        if (videoElement) {
+          videoElement.srcObject = mediaStream;
+        }
+      }, 300);
+    } catch (err) {
+      console.error("Camera access failed", err);
+      setCameraError("Camera access was denied or is unavailable. Photo capture is mandatory to clock in.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+  };
+
+  const handleOpenClockInCamera = () => {
+    setOpenCameraModal(true);
+    startCamera();
+  };
+
+  const handleCaptureAndClockIn = () => {
+    const videoElement = document.getElementById('webcam-preview');
+    if (!videoElement) {
+      alert("Camera preview is not active.");
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = videoElement.videoWidth || 640;
+    canvas.height = videoElement.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        alert("Failed to capture image from camera.");
+        return;
+      }
+      stopCamera();
+      setOpenCameraModal(false);
+      await performClockIn(blob);
+    }, 'image/jpeg', 0.85);
+  };
+
+  const performClockIn = async (photoBlob) => {
+    if (!gpsData) return;
+    setGpsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('latitude', gpsData.latitude);
+      formData.append('longitude', gpsData.longitude);
+      if (gpsData.accuracy) {
+        formData.append('accuracy', gpsData.accuracy);
+      }
+      formData.append('address', address);
+      formData.append('device_info', `Web Browser (${navigator.userAgent.substring(0, 50)})`);
+      formData.append('captured_image', photoBlob, `attendance_${Date.now()}.jpg`);
+
+      const response = await api.post('/attendance/records/check-in/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
       setIsClockedIn(true);
       setAttendanceToday(response.data);
@@ -219,8 +289,15 @@ export default function Attendance() {
       fetchHistory();
     } catch (e) {
       setGpsError(getError(e, "Failed to check in."));
+    } finally {
+      setGpsLoading(false);
     }
   };
+
+  const handleClockIn = () => {
+    handleOpenClockInCamera();
+  };
+
 
   const handleClockOut = async () => {
     if (!gpsData) return;
@@ -372,6 +449,7 @@ export default function Attendance() {
                   <TableHead sx={{ bgcolor: 'background.neutral' }}>
                     <TableRow>
                       {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Employee</TableCell>}
+                      <TableCell sx={{ fontWeight: 700 }}>Photo</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>In</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Out</TableCell>
@@ -379,6 +457,7 @@ export default function Attendance() {
                       <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                       {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>}
                     </TableRow>
+
                   </TableHead>
                   <TableBody>
                     {(isAdmin ? adminRecords : history).length === 0 ? (
@@ -391,8 +470,18 @@ export default function Attendance() {
                       (isAdmin ? adminRecords : history).map((rec) => (
                         <TableRow key={rec.id}>
                           {isAdmin && <TableCell sx={{ fontWeight: 600 }}>{rec.employee_name}</TableCell>}
+                          <TableCell>
+                            {rec.captured_image ? (
+                              <img 
+                                src={rec.captured_image} 
+                                alt="Checkin" 
+                                style={{ width: 40, height: 40, borderRadius: '6px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.08)' }} 
+                              />
+                            ) : '--'}
+                          </TableCell>
                           <TableCell>{formatDate(rec.date)}</TableCell>
                           <TableCell>{rec.check_in_time || '--'}</TableCell>
+
                           <TableCell>{rec.check_out_time || '--'}</TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -595,6 +684,40 @@ export default function Attendance() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Camera Capture Dialog */}
+      <Dialog open={openCameraModal} onClose={() => { stopCamera(); setOpenCameraModal(false); }} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Verify Check-In Identity</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, pt: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Workforce OS requires real-time photo capture to complete your check-in.
+          </Typography>
+          {cameraError ? (
+            <Alert severity="error" sx={{ width: '100%' }}>{cameraError}</Alert>
+          ) : (
+            <Box sx={{ width: '100%', aspectRatio: '4/3', bgcolor: 'black', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
+              <video
+                id="webcam-preview"
+                autoPlay
+                playsInline
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5 }}>
+          <Button onClick={() => { stopCamera(); setOpenCameraModal(false); }} variant="outlined">
+            Cancel
+          </Button>
+          {!cameraError && (
+            <Button onClick={handleCaptureAndClockIn} variant="contained" color="success">
+              Capture & Clock In
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
+
   );
 }

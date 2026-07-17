@@ -4,12 +4,15 @@ from rest_framework.response import Response
 from django.core.exceptions import ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from .models import Shift, Attendance, Overtime
 from .serializers import (
     ShiftSerializer, AttendanceSerializer, OvertimeSerializer,
     CheckInSerializer, CheckOutSerializer
 )
 from .services import AttendanceService
+
+User = get_user_model()
 
 
 class ShiftViewSet(viewsets.ModelViewSet):
@@ -33,6 +36,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'date', 'status']
+
+    from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
         user = self.request.user
@@ -61,9 +67,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 lng=serializer.validated_data['longitude'],
                 accuracy=serializer.validated_data.get('accuracy'),
                 address=serializer.validated_data.get('address', ''),
-                device_info=serializer.validated_data.get('device_info', '')
+                device_info=serializer.validated_data.get('device_info', ''),
+                captured_image=serializer.validated_data['captured_image']
             )
-            return Response(AttendanceSerializer(record).data, status=status.HTTP_201_CREATED)
+            return Response(AttendanceSerializer(record, context={'request': request}).data, status=status.HTTP_201_CREATED)
         except ValidationError as e:
             msg = e.messages[0] if hasattr(e, 'messages') else str(e)
             if msg.startswith("['") and msg.endswith("']"):
@@ -127,6 +134,92 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             }
         )
         return Response(OvertimeSerializer(ot).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='analytics')
+    def analytics(self, request):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        employee_id = request.query_params.get('employee')
+        branch_id = request.query_params.get('branch')
+        month = request.query_params.get('month')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        qs = Attendance.objects.filter(employee__company=request.user.company)
+
+        if request.user.role == 'MANAGER':
+            qs = qs.filter(employee__firm=request.user.firm)
+
+        if employee_id and employee_id != 'ALL' and employee_id != 'undefined':
+            qs = qs.filter(employee_id=employee_id)
+        
+        if branch_id and branch_id != 'ALL' and branch_id != 'undefined':
+            qs = qs.filter(employee__firm_id=branch_id)
+
+        import datetime
+        if start_date_str:
+            try:
+                qs = qs.filter(date__gte=datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date())
+            except ValueError:
+                pass
+        if end_date_str:
+            try:
+                qs = qs.filter(date__lte=datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date())
+            except ValueError:
+                pass
+        
+        if month:
+            try:
+                year_val, month_val = map(int, month.split('-'))
+                qs = qs.filter(date__year=year_val, date__month=month_val)
+            except ValueError:
+                pass
+
+        employees = User.objects.filter(company=request.user.company)
+        if request.user.role == 'MANAGER':
+            employees = employees.filter(firm=request.user.firm)
+        else:
+            if branch_id and branch_id != 'ALL' and branch_id != 'undefined':
+                employees = employees.filter(firm_id=branch_id)
+
+        if employee_id and employee_id != 'ALL' and employee_id != 'undefined':
+            employees = employees.filter(id=employee_id)
+
+        results = []
+        for emp in employees:
+            emp_qs = qs.filter(employee=emp)
+            
+            present_days = emp_qs.filter(status__in=[Attendance.Statuses.PRESENT, Attendance.Statuses.LATE, Attendance.Statuses.HALF_DAY]).count()
+            absent_days = emp_qs.filter(status=Attendance.Statuses.ABSENT).count()
+            leave_days = emp_qs.filter(status=Attendance.Statuses.LEAVE).count()
+
+            from django.db.models import Sum
+            total_working_hours = float(emp_qs.aggregate(total=Sum('total_worked_hours'))['total'] or 0.0)
+            total_break_hours = float(emp_qs.aggregate(total=Sum('break_hours'))['total'] or 0.0)
+            total_overtime_hours = float(emp_qs.aggregate(total=Sum('overtime_hours'))['total'] or 0.0)
+
+            records = []
+            for record in emp_qs.order_by('-date'):
+                records.append(AttendanceSerializer(record, context={'request': request}).data)
+
+            results.append({
+                'employee_id': emp.id,
+                'employee_username': emp.username,
+                'employee_first_name': emp.first_name,
+                'employee_last_name': emp.last_name,
+                'branch_name': emp.firm.name if emp.firm else 'Default',
+                'present_days': present_days,
+                'absent_days': absent_days,
+                'leave_days': leave_days,
+                'total_working_hours': total_working_hours,
+                'total_break_hours': total_break_hours,
+                'total_overtime_hours': total_overtime_hours,
+                'records': records
+            })
+
+        return Response(results)
+
 
 
 class OvertimeViewSet(viewsets.ModelViewSet):

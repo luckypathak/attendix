@@ -56,6 +56,10 @@ class Attendance(SoftDeleteModel):
         choices=Statuses.choices,
         default=Statuses.PRESENT
     )
+    captured_image = models.ImageField(upload_to='attendance_photos/', null=True, blank=True)
+    total_worked_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    break_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    overtime_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     
     # Check-in GPS info
     check_in_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
@@ -116,3 +120,35 @@ class Overtime(SoftDeleteModel):
 
     def __str__(self):
         return f"{self.employee.username} - {self.date} - {self.hours} hrs"
+
+
+class AttendanceSession(SoftDeleteModel):
+    attendance = models.ForeignKey(
+        Attendance,
+        on_delete=models.CASCADE,
+        related_name='sessions'
+    )
+    check_in_time = models.TimeField()
+    check_out_time = models.TimeField(null=True, blank=True)
+    captured_image = models.ImageField(upload_to='attendance_photos/', null=True, blank=True)
+    
+    # Check-in GPS
+    check_in_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_in_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_in_accuracy = models.FloatField(null=True, blank=True)
+    check_in_address = models.TextField(null=True, blank=True)
+    check_in_device_info = models.CharField(max_length=255, null=True, blank=True)
+
+    # Check-out GPS
+    check_out_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_out_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    check_out_accuracy = models.FloatField(null=True, blank=True)
+    check_out_address = models.TextField(null=True, blank=True)
+    check_out_device_info = models.CharField(max_length=255, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Session of {self.attendance.employee.username} on {self.attendance.date}"
+

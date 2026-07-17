@@ -1,9 +1,17 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import EmployeeProfile
+from .models import EmployeeProfile, EmployeeFirmAllocation
 from attendix.apps.company.models import Department, Designation, Firm
 
 User = get_user_model()
+
+
+class EmployeeFirmAllocationSerializer(serializers.ModelSerializer):
+    firm_name = serializers.CharField(source='firm.name', read_only=True)
+    
+    class Meta:
+        model = EmployeeFirmAllocation
+        fields = ('id', 'firm', 'firm_name', 'base_salary', 'pf_type', 'pf_value')
 
 
 class EmployeeProfileSerializer(serializers.ModelSerializer):
@@ -39,6 +47,7 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
     shift_name = serializers.CharField(source='shift.name', read_only=True)
     shift_start_time = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     shift_end_time = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    firm_allocations = EmployeeFirmAllocationSerializer(many=True, required=False)
 
     class Meta:
         model = EmployeeProfile
@@ -48,6 +57,7 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
             'manager_id', 'manager_name', 'base_salary', 'hourly_rate', 'joining_date',
             'pan_number', 'bank_account_no', 'bank_ifsc_code', 'created_at', 'updated_at',
             'password', 'firm_id', 'firm_name', 'shift_id', 'shift_name', 'pf_deduction',
+            'pf_type', 'pf_value', 'firm_allocations',
             'shift_start_time', 'shift_end_time', 'allowed_leaves', 'used_leaves'
         )
 
@@ -60,6 +70,7 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
         return ret
 
     def create(self, validated_data):
+        firm_allocations_data = validated_data.pop('firm_allocations', [])
         user_data = validated_data.pop('user', {})
         dept_data = validated_data.pop('department', {})
         desg_data = validated_data.pop('designation', {})
@@ -138,11 +149,15 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
             **validated_data
         )
 
+        for alloc_data in firm_allocations_data:
+            EmployeeFirmAllocation.objects.create(employee_profile=profile, **alloc_data)
+
         # Profile creation complete
 
         return profile
 
     def update(self, instance, validated_data):
+        firm_allocations_data = validated_data.pop('firm_allocations', None)
         user_data = validated_data.pop('user', {})
         dept_data = validated_data.pop('department', {})
         desg_data = validated_data.pop('designation', {})
@@ -215,5 +230,26 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+
+        if firm_allocations_data is not None:
+            existing_allocs = {a.firm.id: a for a in instance.firm_allocations.all()}
+            incoming_firm_ids = [a['firm'].id for a in firm_allocations_data]
+            
+            # Delete removed ones
+            for f_id, alloc in existing_allocs.items():
+                if f_id not in incoming_firm_ids:
+                    alloc.delete()
+            
+            # Create or update incoming
+            for alloc_data in firm_allocations_data:
+                firm = alloc_data['firm']
+                if firm.id in existing_allocs:
+                    alloc = existing_allocs[firm.id]
+                    alloc.base_salary = alloc_data.get('base_salary', alloc.base_salary)
+                    alloc.pf_type = alloc_data.get('pf_type', alloc.pf_type)
+                    alloc.pf_value = alloc_data.get('pf_value', alloc.pf_value)
+                    alloc.save()
+                else:
+                    EmployeeFirmAllocation.objects.create(employee_profile=instance, **alloc_data)
 
         return instance

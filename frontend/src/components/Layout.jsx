@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   AppBar, Box, IconButton, Toolbar, Typography, Avatar, 
@@ -20,6 +20,7 @@ export default function Layout() {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toggleColorMode } = useContext(ColorModeContext);
   
   const { user } = useSelector((state) => state.auth);
@@ -28,10 +29,16 @@ export default function Layout() {
   const [selectedFirm, setSelectedFirm] = useState(localStorage.getItem('selectedFirmId') || 'ALL');
 
   useEffect(() => {
+    // Reset scroll locks on route changes
+    document.body.style.overflow = 'unset';
+  }, [location.pathname]);
+
+  useEffect(() => {
     if (user && (user.role === 'SUPER_ADMIN' || user.role === 'COMPANY_ADMIN')) {
       fetchFirms();
     }
   }, [user]);
+
 
   const fetchFirms = async () => {
     try {

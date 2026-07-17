@@ -10,6 +10,7 @@ import Companies from './pages/Companies';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
+import AttendanceAnalytics from './pages/AttendanceAnalytics';
 import Leaves from './pages/Leaves';
 import Payroll from './pages/Payroll';
 import Reimbursements from './pages/Reimbursements';
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="employees" element={<Employees />} />
           <Route path="attendance" element={<Attendance />} />
+          <Route path="attendance-analytics" element={<AttendanceAnalytics />} />
           <Route path="leaves" element={<Leaves />} />
           <Route path="payroll" element={<Payroll />} />
           <Route path="reimbursements" element={<Reimbursements />} />
@@ -54,6 +56,7 @@ export default function App() {
           <Route path="audit" element={<AuditLogs />} />
           <Route path="companies" element={<Companies />} />
         </Route>
+
 
         {/* Catch-all fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

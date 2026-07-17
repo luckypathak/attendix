@@ -8,7 +8,7 @@ import {
 import { 
   LayoutDashboard, CalendarRange, FileSpreadsheet, 
   WalletCards, CheckSquare, MessageSquareShare, FileClock, Shield,
-  Users, Landmark
+  Users, Landmark, BarChart2
 } from 'lucide-react';
 
 const drawerWidth = 240;
@@ -21,6 +21,7 @@ export default function Sidebar({ open, mobileOpen, handleDrawerToggle }) {
     { text: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
     { text: 'Employees', path: '/employees', icon: <Users size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'] },
     { text: 'Attendance', path: '/attendance', icon: <CalendarRange size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
+    { text: 'Attendance Analytics', path: '/attendance-analytics', icon: <BarChart2 size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'] },
     { text: 'Leaves', path: '/leaves', icon: <FileSpreadsheet size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
     { text: 'Payroll', path: '/payroll', icon: <WalletCards size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
     { text: 'Reimbursement', path: '/reimbursements', icon: <WalletCards size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
@@ -29,6 +30,7 @@ export default function Sidebar({ open, mobileOpen, handleDrawerToggle }) {
     { text: 'Audit Logs', path: '/audit', icon: <FileClock size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
     { text: 'Companies', path: '/companies', icon: <Landmark size={20} />, roles: ['SUPER_ADMIN'] },
   ];
+
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(role));
 

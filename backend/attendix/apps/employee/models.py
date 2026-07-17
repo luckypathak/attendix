@@ -43,6 +43,13 @@ class EmployeeProfile(SoftDeleteModel):
         related_name='employee_profiles'
     )
     pf_deduction = models.BooleanField(default=False)
+    pf_type = models.CharField(
+        max_length=20,
+        choices=[('percentage', 'Percentage'), ('flat', 'Flat Amount'), ('disabled', 'Disabled')],
+        default='disabled'
+    )
+    pf_value = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    
     allowed_leaves = models.IntegerField(default=12)
     used_leaves = models.IntegerField(default=0)
 
@@ -70,3 +77,33 @@ class EmployeeProfile(SoftDeleteModel):
 
     def __str__(self):
         return f"Profile of {self.user.username}"
+
+
+class EmployeeFirmAllocation(SoftDeleteModel):
+    employee_profile = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.CASCADE,
+        related_name='firm_allocations'
+    )
+    firm = models.ForeignKey(
+        'company.Firm',
+        on_delete=models.CASCADE,
+        related_name='employee_allocations'
+    )
+    base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    pf_type = models.CharField(
+        max_length=20,
+        choices=[('percentage', 'Percentage'), ('flat', 'Flat Amount'), ('disabled', 'Disabled')],
+        default='disabled'
+    )
+    pf_value = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('employee_profile', 'firm')
+
+    def __str__(self):
+        return f"{self.employee_profile.user.username} Allocation at {self.firm.name}"
+
