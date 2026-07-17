@@ -350,7 +350,8 @@ class AttendanceService:
                         profile.save()
                         missed_count = profile.checkout_missed_count
 
-                    session.check_out_time = window_end.time()
+                    # Use the actual time the auto checkout job runs, rather than backdating to window_end
+                    session.check_out_time = now_dt.time()
                     session.auto_checkout = True
                     session.checkout_reason = 'AUTO_CHECKOUT'
                     session.checkout_missed_count = missed_count

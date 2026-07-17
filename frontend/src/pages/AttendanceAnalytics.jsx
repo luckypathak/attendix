@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import api, { getMediaUrl } from '../services/api';
 import { formatDate } from '../utils/format';
+import EditAttendanceModal from '../components/EditAttendanceModal';
+import { Edit2 } from 'lucide-react';
 
 export default function AttendanceAnalytics() {
   const { user } = useSelector((state) => state.auth);
@@ -36,6 +38,9 @@ export default function AttendanceAnalytics() {
 
   // Row expansion state
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null);
+
+  // Edit Modal State
+  const [editSession, setEditSession] = useState(null);
 
   useEffect(() => {
     if (selectedFirm && selectedFirm !== 'ALL') {
@@ -424,7 +429,10 @@ export default function AttendanceAnalytics() {
                                                           Work: {s.working_hours || '--'}
                                                         </Typography>
                                                       </Box>
-                                                      <Box sx={{ display: 'flex', gap: 1 }}>
+                                                      <Box sx={{ display: 'flex', gap: 1, flexGrow: 1, justifyContent: 'flex-end' }}>
+                                                        <IconButton size="small" onClick={() => setEditSession({ ...s, parent_status: rec.status })}>
+                                                          <Edit2 size={14} color="#94a3b8" />
+                                                        </IconButton>
                                                         {s.captured_image && (
                                                           <Tooltip title="Check In Photo">
                                                             <img
@@ -493,6 +501,13 @@ export default function AttendanceAnalytics() {
           )}
         </CardContent>
       </Card>
+
+      <EditAttendanceModal
+        open={Boolean(editSession)}
+        onClose={() => setEditSession(null)}
+        session={editSession}
+        onSaved={fetchAnalytics}
+      />
     </Box>
   );
 }

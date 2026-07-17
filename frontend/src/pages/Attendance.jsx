@@ -10,6 +10,7 @@ import {
 import { MapPin, ShieldAlert, CheckCircle, Clock } from 'lucide-react';
 import api, { getMediaUrl } from '../services/api';
 import { formatDate } from '../utils/format';
+import EditAttendanceModal from '../components/EditAttendanceModal';
 
 export default function Attendance() {
   const { user } = useSelector((state) => state.auth);
@@ -38,6 +39,20 @@ export default function Attendance() {
   const [cameraError, setCameraError] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
 
+  // Edit Modal State
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedSessionForEdit, setSelectedSessionForEdit] = useState(null);
+
+  const handleDeleteSession = async (sessionId) => {
+    if (!window.confirm("Are you sure you want to delete this session?")) return;
+    try {
+      await api.delete('/attendance/records/delete-session/', { data: { session_id: sessionId } });
+      fetchHistory();
+      if (isAdmin) fetchAdminRecords();
+    } catch (err) {
+      alert("Failed to delete session.");
+    }
+  };
 
   useEffect(() => {
     fetchHistory();
@@ -680,6 +695,19 @@ export default function Attendance() {
                                           </Typography>
                                         )}
                                       </Box>
+
+                                      {/* Admin Actions */}
+                                      {isAdmin && (
+                                        <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+                                          <Button size="small" variant="outlined" onClick={() => {
+                                            // Provide parent status to modal
+                                            const sessWithParentStatus = { ...sess, parent_status: rec.status };
+                                            setSelectedSessionForEdit(sessWithParentStatus);
+                                            setEditModalOpen(true);
+                                          }}>Edit</Button>
+                                          <Button size="small" color="error" variant="outlined" onClick={() => handleDeleteSession(sess.id)}>Delete</Button>
+                                        </Box>
+                                      )}
                                     </Box>
                                   ))
                                 ) : (
@@ -916,7 +944,18 @@ export default function Attendance() {
           <img src={previewImage} alt="Preview" style={{ width: '100%', height: 'auto', display: 'block' }} />
         </DialogContent>
       </Dialog>
+      
+      {editModalOpen && (
+        <EditAttendanceModal
+          open={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          session={selectedSessionForEdit}
+          onSaved={() => {
+            fetchHistory();
+            if (isAdmin) fetchAdminRecords();
+          }}
+        />
+      )}
     </Box>
-
   );
 }

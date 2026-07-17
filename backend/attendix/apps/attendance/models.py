@@ -200,3 +200,26 @@ class StoredFile(models.Model):
     def __str__(self):
         return self.name
 
+class AttendanceAuditLog(models.Model):
+    session = models.ForeignKey(
+        AttendanceSession,
+        on_delete=models.CASCADE,
+        related_name='audit_logs'
+    )
+    edited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='attendance_edits'
+    )
+    edited_at = models.DateTimeField(auto_now_add=True)
+    old_value = models.JSONField(null=True, blank=True)
+    new_value = models.JSONField(null=True, blank=True)
+    reason = models.TextField()
+
+    class Meta:
+        ordering = ['-edited_at']
+
+    def __str__(self):
+        return f"Edit by {self.edited_by.username if self.edited_by else 'Unknown'} on session {self.session.id}"
+

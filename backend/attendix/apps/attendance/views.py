@@ -220,6 +220,170 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             )
         return Response(OvertimeSerializer(ot).data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['patch'], url_path='edit-session')
+    def edit_session(self, request):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            return Response({"detail": "Only managers/admins can edit attendance sessions."}, status=status.HTTP_403_FORBIDDEN)
+        
+        session_id = request.data.get('session_id')
+        if not session_id:
+            return Response({"detail": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        reason = request.data.get('reason')
+        if not reason:
+            return Response({"detail": "Reason is required for editing attendance."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from .models import AttendanceSession, AttendanceAuditLog
+        try:
+            session = AttendanceSession.objects.select_related('attendance').get(id=session_id)
+        except AttendanceSession.DoesNotExist:
+            return Response({"detail": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+        # Ensure the admin has permission to edit this employee
+        employee = session.attendance.employee
+        if request.user.role == 'MANAGER' and (employee.company != request.user.company or employee.firm != request.user.firm):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == 'COMPANY_ADMIN' and employee.company != request.user.company:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+            
+        old_value = {
+            'check_in_time': str(session.check_in_time) if session.check_in_time else None,
+            'check_out_time': str(session.check_out_time) if session.check_out_time else None,
+            'status': session.attendance.status,
+            'ot_status': session.ot_status,
+            'continue_shift': session.continue_shift,
+            'auto_checkout': session.auto_checkout,
+            'check_in_address': session.check_in_address,
+            'check_out_address': session.check_out_address,
+            'captured_image': session.captured_image.name if session.captured_image else None,
+            'check_out_captured_image': session.check_out_captured_image.name if session.check_out_captured_image else None,
+        }
+        
+        import datetime
+        def parse_time(t_str):
+            if not t_str: return None
+            try:
+                # Handle HH:MM:SS or HH:MM
+                parts = t_str.split(':')
+                if len(parts) >= 2:
+                    return datetime.time(int(parts[0]), int(parts[1]), int(parts[2]) if len(parts)>2 else 0)
+            except Exception:
+                pass
+            return None
+            
+        if 'check_in_time' in request.data:
+            session.check_in_time = parse_time(request.data['check_in_time'])
+        if 'check_out_time' in request.data:
+            session.check_out_time = parse_time(request.data['check_out_time'])
+        if 'ot_status' in request.data:
+            session.ot_status = request.data['ot_status']
+        if 'continue_shift' in request.data:
+            # Handle string boolean from multipart/form-data
+            val = request.data['continue_shift']
+            session.continue_shift = str(val).lower() == 'true' if isinstance(val, str) else bool(val)
+        if 'auto_checkout' in request.data:
+            val = request.data['auto_checkout']
+            session.auto_checkout = str(val).lower() == 'true' if isinstance(val, str) else bool(val)
+            
+        if 'check_in_address' in request.data:
+            session.check_in_address = request.data['check_in_address']
+        if 'check_out_address' in request.data:
+            session.check_out_address = request.data['check_out_address']
+            
+        if 'captured_image' in request.FILES:
+            session.captured_image = request.FILES['captured_image']
+        if 'check_out_captured_image' in request.FILES:
+            session.check_out_captured_image = request.FILES['check_out_captured_image']
+            
+        session.save()
+        
+        # Optionally allow forcing a specific status on the parent attendance
+        if 'status' in request.data:
+            session.attendance.status = request.data['status']
+            session.attendance.save()
+            
+        # Also sync parent attendance checkout time if this is the last session
+        last_session = session.attendance.sessions.order_by('-check_in_time').first()
+        if session.id == last_session.id:
+            session.attendance.check_in_time = last_session.check_in_time
+            session.attendance.check_out_time = last_session.check_out_time
+            session.attendance.save()
+            
+        # Log the audit
+        new_value = {
+            'check_in_time': str(session.check_in_time) if session.check_in_time else None,
+            'check_out_time': str(session.check_out_time) if session.check_out_time else None,
+            'status': session.attendance.status,
+            'ot_status': session.ot_status,
+            'continue_shift': session.continue_shift,
+            'auto_checkout': session.auto_checkout,
+            'check_in_address': session.check_in_address,
+            'check_out_address': session.check_out_address,
+            'captured_image': session.captured_image.name if session.captured_image else None,
+            'check_out_captured_image': session.check_out_captured_image.name if session.check_out_captured_image else None,
+        }
+        AttendanceAuditLog.objects.create(
+            session=session,
+            edited_by=request.user,
+            old_value=old_value,
+            new_value=new_value,
+            reason=reason
+        )
+        
+        # Recalculate metrics
+        from .services import AttendanceService
+        AttendanceService._recalculate_attendance_metrics(
+            session.attendance,
+            session.attendance.shift or AttendanceService.get_active_shift(employee),
+            session.attendance.date
+        )
+        
+        return Response({"detail": "Session updated successfully."}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['delete'], url_path='delete-session')
+    def delete_session(self, request):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            return Response({"detail": "Only managers/admins can delete attendance sessions."}, status=status.HTTP_403_FORBIDDEN)
+            
+        session_id = request.data.get('session_id')
+        if not session_id:
+            return Response({"detail": "session_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from .models import AttendanceSession, AttendanceAuditLog
+        try:
+            session = AttendanceSession.objects.select_related('attendance').get(id=session_id)
+        except AttendanceSession.DoesNotExist:
+            return Response({"detail": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+        employee = session.attendance.employee
+        if request.user.role == 'MANAGER' and (employee.company != request.user.company or employee.firm != request.user.firm):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == 'COMPANY_ADMIN' and employee.company != request.user.company:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+            
+        attendance = session.attendance
+        old_value = {'deleted': True, 'check_in_time': str(session.check_in_time), 'check_out_time': str(session.check_out_time)}
+        
+        session.delete()
+        
+        AttendanceAuditLog.objects.create(
+            session=None,  # session is deleted
+            edited_by=request.user,
+            old_value=old_value,
+            new_value={'deleted': True},
+            reason="Admin deleted session"
+        )
+        
+        # Recalculate metrics for the parent attendance
+        from .services import AttendanceService
+        AttendanceService._recalculate_attendance_metrics(
+            attendance,
+            attendance.shift or AttendanceService.get_active_shift(employee),
+            attendance.date
+        )
+        
+        return Response({"detail": "Session deleted successfully."}, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='analytics')
     def analytics(self, request):
         if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
