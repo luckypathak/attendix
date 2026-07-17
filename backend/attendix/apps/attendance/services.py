@@ -219,9 +219,28 @@ class AttendanceService:
         break_seconds = max(0.0, total_elapsed_seconds - total_worked_seconds)
         attendance.break_hours = round(break_seconds / 3600.0, 2)
 
-        # Half-day rule: If worked hours is less than 6 hours, downgrade status to HALF_DAY
-        if total_worked_hours < 6.0:
+        # Half-day rule: If worked hours is less than shift duration (or 6.0 hrs fallback), downgrade status to HALF_DAY
+        half_day_threshold = float(shift.duration_hours) if shift else 6.0
+        if total_worked_hours < half_day_threshold:
             attendance.status = Attendance.Statuses.HALF_DAY
+        else:
+            # If they completed the full shift, restore status from HALF_DAY to PRESENT or LATE
+            if attendance.status == Attendance.Statuses.HALF_DAY:
+                if shift:
+                    shift_start = shift.start_time
+                    dummy_date = datetime.date(2000, 1, 1)
+                    start_datetime = datetime.datetime.combine(dummy_date, shift_start)
+                    if attendance.check_in_time:
+                        checkin_datetime = datetime.datetime.combine(dummy_date, attendance.check_in_time)
+                        difference_mins = (checkin_datetime - start_datetime).total_seconds() / 60.0
+                        if difference_mins > shift.grace_period_minutes:
+                            attendance.status = Attendance.Statuses.LATE
+                        else:
+                            attendance.status = Attendance.Statuses.PRESENT
+                    else:
+                        attendance.status = Attendance.Statuses.PRESENT
+                else:
+                    attendance.status = Attendance.Statuses.PRESENT
 
         # Overtime calculation based on worked hours vs shift duration
         if shift:
