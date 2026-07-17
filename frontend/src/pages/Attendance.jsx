@@ -32,6 +32,8 @@ export default function Attendance() {
 
   // Camera states
   const [openCameraModal, setOpenCameraModal] = useState(false);
+  const [cameraMode, setCameraMode] = useState('IN'); // 'IN' or 'OUT'
+  const [previewImage, setPreviewImage] = useState(null);
   const [stream, setStream] = useState(null);
   const [cameraError, setCameraError] = useState(null);
 
@@ -49,41 +51,28 @@ export default function Attendance() {
       const response = await api.get('/attendance/records/history/');
       setHistory(response.data);
       
-      const getCheckInDateTime = (dateStr, timeStr) => {
-        const [year, month, day] = dateStr.split('-').map(Number);
-        const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-        let hours = 9, minutes = 0;
-        if (match) {
-          hours = parseInt(match[1]);
-          minutes = parseInt(match[2]);
-          const ampm = match[3].toUpperCase();
-          if (ampm === 'PM' && hours < 12) hours += 12;
-          if (ampm === 'AM' && hours === 12) hours = 0;
-        } else {
-          const parts = timeStr.split(':');
-          if (parts.length >= 2) {
-            hours = parseInt(parts[0]);
-            minutes = parseInt(parts[1]);
+      // Find if there is an active session
+      let activeRec = null;
+      let activeSess = null;
+      for (const rec of response.data) {
+        if (rec.sessions) {
+          const openSess = rec.sessions.find(sess => !sess.check_out_time);
+          if (openSess) {
+            activeRec = rec;
+            activeSess = openSess;
+            break;
           }
         }
-        return new Date(year, month - 1, day, hours, minutes);
-      };
+      }
 
-      const openRecord = response.data.find(rec => rec.check_in_time && !rec.check_out_time);
-      if (openRecord) {
-        const checkInDt = getCheckInDateTime(openRecord.date, openRecord.check_in_time);
-        const nowDt = new Date();
-        const elapsedHours = (nowDt - checkInDt) / (1000 * 60 * 60);
-        
-        if (elapsedHours < 20) {
-          setAttendanceToday(openRecord);
-          setIsClockedIn(true);
-        } else {
-          setAttendanceToday(null);
-          setIsClockedIn(false);
-        }
+      if (activeRec && activeSess) {
+        setAttendanceToday(activeRec);
+        setIsClockedIn(true);
       } else {
-        setAttendanceToday(null);
+        // If no active session, find if there is a record for today to show in summary
+        const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+        const todayRec = response.data.find(rec => rec.date === todayStr);
+        setAttendanceToday(todayRec || null);
         setIsClockedIn(false);
       }
     } catch (e) {
@@ -237,11 +226,18 @@ export default function Attendance() {
   };
 
   const handleOpenClockInCamera = () => {
+    setCameraMode('IN');
     setOpenCameraModal(true);
     startCamera();
   };
 
-  const handleCaptureAndClockIn = () => {
+  const handleOpenClockOutCamera = () => {
+    setCameraMode('OUT');
+    setOpenCameraModal(true);
+    startCamera();
+  };
+
+  const handleCaptureAndProcess = () => {
     const videoElement = document.getElementById('webcam-preview');
     if (!videoElement) {
       alert("Camera preview is not active.");
@@ -261,13 +257,18 @@ export default function Attendance() {
       }
       stopCamera();
       setOpenCameraModal(false);
-      await performClockIn(blob);
+      if (cameraMode === 'IN') {
+        await performClockIn(blob);
+      } else {
+        await performClockOut(blob);
+      }
     }, 'image/jpeg', 0.85);
   };
 
   const performClockIn = async (photoBlob) => {
     if (!gpsData) return;
     setGpsLoading(true);
+    setGpsError(null);
     try {
       const formData = new FormData();
       formData.append('latitude', gpsData.latitude);
@@ -296,20 +297,25 @@ export default function Attendance() {
     }
   };
 
-  const handleClockIn = () => {
-    handleOpenClockInCamera();
-  };
-
-
-  const handleClockOut = async () => {
+  const performClockOut = async (photoBlob) => {
     if (!gpsData) return;
+    setGpsLoading(true);
+    setGpsError(null);
     try {
-      const response = await api.post('/attendance/records/check-out/', {
-        latitude: gpsData.latitude,
-        longitude: gpsData.longitude,
-        accuracy: gpsData.accuracy,
-        address: address,
-        device_info: `Web Browser (${navigator.userAgent.substring(0, 50)})`
+      const formData = new FormData();
+      formData.append('latitude', gpsData.latitude);
+      formData.append('longitude', gpsData.longitude);
+      if (gpsData.accuracy) {
+        formData.append('accuracy', gpsData.accuracy);
+      }
+      formData.append('address', address);
+      formData.append('device_info', `Web Browser (${navigator.userAgent.substring(0, 50)})`);
+      formData.append('captured_image', photoBlob, `attendance_checkout_${Date.now()}.jpg`);
+
+      const response = await api.post('/attendance/records/check-out/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
       setIsClockedIn(false);
       setAttendanceToday(response.data);
@@ -319,7 +325,17 @@ export default function Attendance() {
       fetchOvertimeRequests();
     } catch (e) {
       setGpsError(getError(e, "Failed to check out."));
+    } finally {
+      setGpsLoading(false);
     }
+  };
+
+  const handleClockIn = () => {
+    handleOpenClockInCamera();
+  };
+
+  const handleClockOut = () => {
+    handleOpenClockOutCamera();
   };
 
   const getStatusChipColor = (status) => {
@@ -366,11 +382,29 @@ export default function Attendance() {
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     {isClockedIn ? 'Currently Clocked In' : 'Currently Clocked Out'}
                   </Typography>
-                  {attendanceToday && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      Check-in time: {attendanceToday.check_in_time} {attendanceToday.check_out_time ? `| Check-out time: ${attendanceToday.check_out_time}` : ''}
-                    </Typography>
-                  )}
+                  {isClockedIn && attendanceToday && attendanceToday.sessions ? (() => {
+                    const activeSess = attendanceToday.sessions.find(s => !s.check_out_time);
+                    return activeSess ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Active Session Check-in: <strong>{activeSess.check_in_time}</strong>
+                      </Typography>
+                    ) : null;
+                  })() : null}
+                  {!isClockedIn && attendanceToday && attendanceToday.sessions && attendanceToday.sessions.length > 0 ? (() => {
+                    const lastSess = attendanceToday.sessions[attendanceToday.sessions.length - 1];
+                    return (
+                      <Box sx={{ mt: 1 }}>
+                        {lastSess.check_out_time && (
+                          <Typography variant="body2" color="text.secondary">
+                            Last Clock-out: <strong>{lastSess.check_out_time}</strong>
+                          </Typography>
+                        )}
+                        <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600, color: 'primary.main' }}>
+                          Today's Total: {attendanceToday.total_worked_hours || '0.00'} Hours
+                        </Typography>
+                      </Box>
+                    );
+                  })() : null}
                 </Box>
 
                 {/* Capture Location Section */}
@@ -399,17 +433,7 @@ export default function Attendance() {
 
                 {/* Action Buttons */}
                 <Box sx={{ width: '100%', display: 'flex', gap: 2 }}>
-                  {attendanceToday && attendanceToday.check_in_time && attendanceToday.check_out_time ? (
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      size="large"
-                      disabled
-                      sx={{ py: 1.5, '&.Mui-disabled': { color: 'text.secondary', bgcolor: 'rgba(255,255,255,0.05)' } }}
-                    >
-                      Shift Completed Today
-                    </Button>
-                  ) : isClockedIn ? (
+                  {isClockedIn ? (
                     <Button
                       variant="contained"
                       color="secondary"
@@ -452,78 +476,139 @@ export default function Attendance() {
                 <Table>
                   <TableHead sx={{ bgcolor: 'background.neutral' }}>
                     <TableRow>
-                      {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Employee</TableCell>}
-                      <TableCell sx={{ fontWeight: 700 }}>Photo</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>In</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Out</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Locations (In / Out)</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                      {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>}
+                      <TableCell sx={{ fontWeight: 700 }}>Attendance Log & Sessions</TableCell>
                     </TableRow>
-
                   </TableHead>
                   <TableBody>
                     {(isAdmin ? adminRecords : history).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 7 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                        <TableCell align="center" sx={{ py: 4, color: 'text.secondary' }}>
                           No attendance logs available.
                         </TableCell>
                       </TableRow>
                     ) : (
                       (isAdmin ? adminRecords : history).map((rec) => (
                         <TableRow key={rec.id}>
-                          {isAdmin && <TableCell sx={{ fontWeight: 600 }}>{rec.employee_name}</TableCell>}
-                          <TableCell>
-                            {rec.captured_image ? (
-                               <img 
-                                 src={getMediaUrl(rec.captured_image)} 
-                                 alt="Checkin" 
-                                 style={{ width: 40, height: 40, borderRadius: '6px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.08)' }} 
-                               />
-                            ) : '--'}
-                          </TableCell>
-                          <TableCell>{formatDate(rec.date)}</TableCell>
-                          <TableCell>{rec.check_in_time || '--'}</TableCell>
+                          <TableCell colSpan={1} sx={{ p: 0 }}>
+                            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              {/* Daily Header / Summary */}
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, pb: 1.5, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                                    {formatDate(rec.date)}
+                                  </Typography>
+                                  {isAdmin && (
+                                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                                      ({rec.employee_name})
+                                    </Typography>
+                                  )}
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                  <Typography variant="body2">
+                                    <strong>Daily Total:</strong> {rec.total_worked_hours || '0.00'} Hours
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    <strong>Break:</strong> {rec.break_hours || '0.00'} Hours
+                                  </Typography>
+                                  <Chip 
+                                    label={rec.status} 
+                                    size="small" 
+                                    color={getStatusChipColor(rec.status)} 
+                                    sx={{ fontWeight: 600, fontSize: '0.75rem' }}
+                                  />
+                                  {isAdmin && (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={() => handleOpenOtModal(rec)}
+                                      sx={{ fontSize: '0.7rem', py: 0.5 }}
+                                    >
+                                      Pre-Approve OT
+                                    </Button>
+                                  )}
+                                </Box>
+                              </Box>
 
-                          <TableCell>{rec.check_out_time || '--'}</TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                              {rec.check_in_address && (
-                                <Typography variant="caption" sx={{ display: 'block', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rec.check_in_address}>
-                                  📍 <strong>In:</strong> {rec.check_in_address}
-                                </Typography>
-                              )}
-                              {rec.check_out_address && (
-                                <Typography variant="caption" sx={{ display: 'block', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rec.check_out_address}>
-                                  📍 <strong>Out:</strong> {rec.check_out_address}
-                                </Typography>
-                              )}
-                              {!rec.check_in_address && !rec.check_out_address && (
-                                <Typography variant="caption" color="text.secondary">--</Typography>
-                              )}
+                              {/* Sessions List */}
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                {rec.sessions && rec.sessions.length > 0 ? (
+                                  rec.sessions.map((sess, idx) => (
+                                    <Box 
+                                      key={sess.id} 
+                                      sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'space-between',
+                                        p: 1.5, 
+                                        borderRadius: '8px', 
+                                        bgcolor: 'rgba(255,255,255,0.02)',
+                                        border: '1px solid rgba(255,255,255,0.04)',
+                                        flexWrap: 'wrap',
+                                        gap: 2
+                                      }}
+                                    >
+                                      {/* Session Info */}
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, minWidth: '250px' }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, minWidth: '80px', color: 'text.secondary' }}>
+                                          Session {idx + 1}
+                                        </Typography>
+                                        <Box>
+                                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                            🌅 {sess.check_in_time || '--'} &rarr; 🌇 {sess.check_out_time || 'Active'}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary">
+                                            Duration: {sess.working_hours || '--'}
+                                          </Typography>
+                                        </Box>
+                                      </Box>
+
+                                      {/* Session Photos */}
+                                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                        <Box sx={{ textAlign: 'center' }}>
+                                          <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 0.5 }}>Check In</Typography>
+                                          {sess.captured_image ? (
+                                            <img 
+                                              src={getMediaUrl(sess.captured_image)} 
+                                              alt="Checkin" 
+                                              onClick={() => setPreviewImage(getMediaUrl(sess.captured_image))}
+                                              style={{ width: 48, height: 48, borderRadius: '6px', objectFit: 'cover', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }} 
+                                            />
+                                          ) : '--'}
+                                        </Box>
+                                        <Box sx={{ textAlign: 'center' }}>
+                                          <Typography variant="caption" display="block" color="text.secondary" sx={{ mb: 0.5 }}>Check Out</Typography>
+                                          {sess.check_out_captured_image ? (
+                                            <img 
+                                              src={getMediaUrl(sess.check_out_captured_image)} 
+                                              alt="Checkout" 
+                                              onClick={() => setPreviewImage(getMediaUrl(sess.check_out_captured_image))}
+                                              style={{ width: 48, height: 48, borderRadius: '6px', objectFit: 'cover', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }} 
+                                            />
+                                          ) : '--'}
+                                        </Box>
+                                      </Box>
+
+                                      {/* GPS Info */}
+                                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, maxWidth: '300px' }}>
+                                        {sess.check_in_address && (
+                                          <Typography variant="caption" sx={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={sess.check_in_address}>
+                                            📍 <strong>In:</strong> {sess.check_in_address}
+                                          </Typography>
+                                        )}
+                                        {sess.check_out_address && (
+                                          <Typography variant="caption" sx={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={sess.check_out_address}>
+                                            📍 <strong>Out:</strong> {sess.check_out_address}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    </Box>
+                                  ))
+                                ) : (
+                                  <Typography variant="caption" color="text.secondary">No sessions recorded.</Typography>
+                                )}
+                              </Box>
                             </Box>
                           </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={rec.status} 
-                              size="small" 
-                              color={getStatusChipColor(rec.status)} 
-                              sx={{ fontWeight: 600, fontSize: '0.75rem' }}
-                            />
-                          </TableCell>
-                          {isAdmin && (
-                            <TableCell>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => handleOpenOtModal(rec)}
-                                sx={{ fontSize: '0.7rem', py: 0.5 }}
-                              >
-                                Pre-Approve OT
-                              </Button>
-                            </TableCell>
-                          )}
                         </TableRow>
                       ))
                     )}
@@ -691,10 +776,12 @@ export default function Attendance() {
 
       {/* Camera Capture Dialog */}
       <Dialog open={openCameraModal} onClose={() => { stopCamera(); setOpenCameraModal(false); }} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Verify Check-In Identity</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Verify {cameraMode === 'IN' ? 'Check-In' : 'Check-Out'} Identity
+        </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            Workforce OS requires real-time photo capture to complete your check-in.
+            Workforce OS requires real-time photo capture to complete your {cameraMode === 'IN' ? 'check-in' : 'check-out'}.
           </Typography>
           {cameraError ? (
             <Alert severity="error" sx={{ width: '100%' }}>{cameraError}</Alert>
@@ -715,11 +802,22 @@ export default function Attendance() {
             Cancel
           </Button>
           {!cameraError && (
-            <Button onClick={handleCaptureAndClockIn} variant="contained" color="success">
-              Capture & Clock In
+            <Button onClick={handleCaptureAndProcess} variant="contained" color="success">
+              Capture & {cameraMode === 'IN' ? 'Clock In' : 'Clock Out'}
             </Button>
           )}
         </DialogActions>
+      </Dialog>
+
+      {/* Photo Preview Dialog */}
+      <Dialog open={!!previewImage} onClose={() => setPreviewImage(null)} maxWidth="sm">
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>Verification Photo</Typography>
+          <Button onClick={() => setPreviewImage(null)} size="small" variant="text" sx={{ minWidth: 0, p: 0.5 }}>Close</Button>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          <img src={previewImage} alt="Preview" style={{ width: '100%', height: 'auto', display: 'block' }} />
+        </DialogContent>
       </Dialog>
     </Box>
 

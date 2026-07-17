@@ -131,6 +131,7 @@ class AttendanceSession(SoftDeleteModel):
     check_in_time = models.TimeField()
     check_out_time = models.TimeField(null=True, blank=True)
     captured_image = models.ImageField(upload_to='attendance_photos/', null=True, blank=True)
+    check_out_captured_image = models.ImageField(upload_to='attendance_photos/', null=True, blank=True)
     
     # Check-in GPS
     check_in_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)

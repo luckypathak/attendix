@@ -142,7 +142,7 @@ class AttendanceService:
         return attendance
 
     @classmethod
-    def check_out(cls, employee, lat, lng, accuracy, address, device_info, timestamp=None):
+    def check_out(cls, employee, lat, lng, accuracy, address, device_info, captured_image=None, timestamp=None):
         if not lat or not lng:
             raise ValidationError("GPS location coordinates are mandatory for check-out.")
 
@@ -167,6 +167,8 @@ class AttendanceService:
         active_session.check_out_accuracy = accuracy
         active_session.check_out_address = address
         active_session.check_out_device_info = device_info
+        if captured_image:
+            active_session.check_out_captured_image = captured_image
         active_session.save()
 
         # Update the parent attendance check out details

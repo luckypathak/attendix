@@ -413,11 +413,40 @@ export default function AttendanceAnalytics() {
                                             </TableCell>
                                             <TableCell>
                                               {rec.sessions && rec.sessions.length > 0 ? (
-                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                                   {rec.sessions.map((s, idx) => (
-                                                    <Typography key={s.id} variant="caption" sx={{ display: 'block', bgcolor: 'rgba(255,255,255,0.03)', px: 0.8, py: 0.3, borderRadius: '4px' }}>
-                                                      Session {idx + 1}: {s.check_in_time} - {s.check_out_time || 'Active'}
-                                                    </Typography>
+                                                    <Box key={s.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'rgba(255,255,255,0.02)', p: 1, borderRadius: '6px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                                                      <Box>
+                                                        <Typography variant="caption" sx={{ display: 'block', fontWeight: 700 }}>
+                                                          S{idx + 1}: {s.check_in_time} - {s.check_out_time || 'Active'}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                          Work: {s.working_hours || '--'}
+                                                        </Typography>
+                                                      </Box>
+                                                      <Box sx={{ display: 'flex', gap: 1 }}>
+                                                        {s.captured_image && (
+                                                          <Tooltip title="Check In Photo">
+                                                            <img
+                                                              src={getMediaUrl(s.captured_image)}
+                                                              alt="In"
+                                                              style={{ width: 28, height: 28, borderRadius: '4px', objectFit: 'cover', cursor: 'pointer' }}
+                                                              onClick={() => window.open(getMediaUrl(s.captured_image), '_blank')}
+                                                            />
+                                                          </Tooltip>
+                                                        )}
+                                                        {s.check_out_captured_image && (
+                                                          <Tooltip title="Check Out Photo">
+                                                            <img
+                                                              src={getMediaUrl(s.check_out_captured_image)}
+                                                              alt="Out"
+                                                              style={{ width: 28, height: 28, borderRadius: '4px', objectFit: 'cover', cursor: 'pointer' }}
+                                                              onClick={() => window.open(getMediaUrl(s.check_out_captured_image), '_blank')}
+                                                            />
+                                                          </Tooltip>
+                                                        )}
+                                                      </Box>
+                                                    </Box>
                                                   ))}
                                                 </Box>
                                               ) : (

@@ -98,9 +98,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 lng=serializer.validated_data['longitude'],
                 accuracy=serializer.validated_data.get('accuracy'),
                 address=serializer.validated_data.get('address', ''),
-                device_info=serializer.validated_data.get('device_info', '')
+                device_info=serializer.validated_data.get('device_info', ''),
+                captured_image=serializer.validated_data['captured_image']
             )
-            return Response(AttendanceSerializer(record).data, status=status.HTTP_200_OK)
+            return Response(AttendanceSerializer(record, context={'request': request}).data, status=status.HTTP_200_OK)
         except ValidationError as e:
             msg = e.messages[0] if hasattr(e, 'messages') else str(e)
             if msg.startswith("['") and msg.endswith("']"):

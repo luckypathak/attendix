@@ -186,5 +186,13 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-old-attendance-photos': {
+        'task': 'attendix.apps.attendance.tasks.cleanup_attendance_photos_task',
+        'schedule': crontab(hour=0, minute=0),
+    },
+}
+
 # SMS Gateway Config
 SMS_GATEWAY_API_KEY = os.getenv('SMS_GATEWAY_API_KEY', 'attendix_gateway_secret_api_key_123')
