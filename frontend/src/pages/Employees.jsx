@@ -5,7 +5,7 @@ import {
   TextField, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, Chip, Alert, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, MenuItem,
-  Checkbox, FormControlLabel, Switch, IconButton
+  Checkbox, FormControlLabel, Switch, IconButton, Divider
 } from '@mui/material';
 import { UserPlus, Shield, Landmark, Calendar, Mail, User, Clock, Settings, Trash2, ArrowRightLeft } from 'lucide-react';
 import api from '../services/api';

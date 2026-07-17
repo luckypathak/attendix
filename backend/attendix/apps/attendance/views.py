@@ -146,16 +146,28 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         start_date_str = request.query_params.get('start_date')
         end_date_str = request.query_params.get('end_date')
 
-        qs = Attendance.objects.filter(employee__company=request.user.company)
+        if request.user.role == 'SUPER_ADMIN':
+            qs = Attendance.objects.all()
+            employees = User.objects.filter(role='EMPLOYEE')
+        else:
+            qs = Attendance.objects.filter(employee__company=request.user.company)
+            employees = User.objects.filter(company=request.user.company, role='EMPLOYEE')
 
         if request.user.role == 'MANAGER':
             qs = qs.filter(employee__firm=request.user.firm)
+            employees = employees.filter(firm=request.user.firm)
 
         if employee_id and employee_id != 'ALL' and employee_id != 'undefined':
-            qs = qs.filter(employee_id=employee_id)
+            try:
+                qs = qs.filter(employee_id=int(employee_id))
+            except ValueError:
+                pass
         
         if branch_id and branch_id != 'ALL' and branch_id != 'undefined':
-            qs = qs.filter(employee__firm_id=branch_id)
+            try:
+                qs = qs.filter(employee__firm_id=int(branch_id))
+            except ValueError:
+                pass
 
         import datetime
         if start_date_str:
@@ -176,15 +188,19 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
 
-        employees = User.objects.filter(company=request.user.company)
-        if request.user.role == 'MANAGER':
-            employees = employees.filter(firm=request.user.firm)
-        else:
+        if request.user.role != 'MANAGER':
             if branch_id and branch_id != 'ALL' and branch_id != 'undefined':
-                employees = employees.filter(firm_id=branch_id)
+                try:
+                    employees = employees.filter(firm_id=int(branch_id))
+                except ValueError:
+                    pass
 
         if employee_id and employee_id != 'ALL' and employee_id != 'undefined':
-            employees = employees.filter(id=employee_id)
+            try:
+                employees = employees.filter(id=int(employee_id))
+            except ValueError:
+                pass
+
 
         results = []
         for emp in employees:

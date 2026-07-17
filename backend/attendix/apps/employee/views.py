@@ -27,9 +27,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # Admin optional query param scoping
         firm_id = self.request.query_params.get('firm')
         if firm_id and firm_id != 'ALL' and firm_id != 'undefined':
-            base_qs = base_qs.filter(user__firm_id=firm_id)
+            try:
+                base_qs = base_qs.filter(user__firm_id=int(firm_id))
+            except ValueError:
+                pass
             
         return base_qs
+
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

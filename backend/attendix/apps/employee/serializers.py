@@ -63,11 +63,23 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        ret['firm_id'] = instance.user.firm.id if (instance.user and instance.user.firm) else None
-        ret['shift_id'] = instance.shift.id if instance.shift else None
-        ret['shift_start_time'] = instance.shift.start_time.strftime('%I:%M %p') if (instance.shift and instance.shift.start_time) else None
-        ret['shift_end_time'] = instance.shift.end_time.strftime('%I:%M %p') if (instance.shift and instance.shift.end_time) else None
+        user = getattr(instance, 'user', None)
+        firm = getattr(user, 'firm', None) if user else None
+        shift = getattr(instance, 'shift', None)
+        
+        ret['firm_id'] = firm.id if firm else None
+        ret['shift_id'] = shift.id if shift else None
+        ret['shift_start_time'] = shift.start_time.strftime('%I:%M %p') if (shift and shift.start_time) else None
+        ret['shift_end_time'] = shift.end_time.strftime('%I:%M %p') if (shift and shift.end_time) else None
+        
+        # Explicitly set representation defaults to prevent DRF from skipping key fields on null relations
+        ret['department_name'] = instance.department.name if instance.department else None
+        ret['designation_name'] = instance.designation.name if instance.designation else None
+        ret['manager_name'] = instance.manager.username if instance.manager else None
+        ret['shift_name'] = shift.name if shift else None
+        
         return ret
+
 
     def create(self, validated_data):
         firm_allocations_data = validated_data.pop('firm_allocations', [])

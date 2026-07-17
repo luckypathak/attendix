@@ -344,100 +344,102 @@ export default function Attendance() {
 
       <Grid container spacing={4}>
         {/* Punch In Card */}
-        <Grid item xs={12} md={5}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'space-between' }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 4, width: '100%' }}>
-                Digital Timecard
-              </Typography>
-
-              {gpsError && (
-                <Alert severity="error" sx={{ width: '100%', mb: 3, borderRadius: 2 }}>
-                  {gpsError}
-                </Alert>
-              )}
-
-              {/* Status Display */}
-              <Box sx={{ textAlign: 'center', mb: 4 }}>
-                <Clock size={48} color={isClockedIn ? '#00f5d4' : '#6c757d'} style={{ margin: '0 auto 16px' }} />
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  {isClockedIn ? 'Currently Clocked In' : 'Currently Clocked Out'}
+        {!isAdmin && (
+          <Grid item xs={12} md={5}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'space-between' }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 4, width: '100%' }}>
+                  Digital Timecard
                 </Typography>
-                {attendanceToday && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Check-in time: {attendanceToday.check_in_time} {attendanceToday.check_out_time ? `| Check-out time: ${attendanceToday.check_out_time}` : ''}
-                  </Typography>
+
+                {gpsError && (
+                  <Alert severity="error" sx={{ width: '100%', mb: 3, borderRadius: 2 }}>
+                    {gpsError}
+                  </Alert>
                 )}
-              </Box>
 
-              {/* Capture Location Section */}
-              {!gpsData ? (
-                <Button 
-                  variant="outlined" 
-                  fullWidth 
-                  size="large"
-                  onClick={captureLocation}
-                  disabled={gpsLoading}
-                  startIcon={<MapPin />}
-                  sx={{ py: 1.5, mb: 2 }}
-                >
-                  {gpsLoading ? <CircularProgress size={24} /> : 'Fetch Live GPS Location'}
-                </Button>
-              ) : (
-                <Box sx={{ width: '100%', p: 2, bgcolor: 'background.default', borderRadius: 3, mb: 3 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <CheckCircle size={16} color="#00f5d4" /> GPS Locked ({gpsData.accuracy.toFixed(1)}m Accuracy)
+                {/* Status Display */}
+                <Box sx={{ textAlign: 'center', mb: 4 }}>
+                  <Clock size={48} color={isClockedIn ? '#00f5d4' : '#6c757d'} style={{ margin: '0 auto 16px' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {isClockedIn ? 'Currently Clocked In' : 'Currently Clocked Out'}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" noWrap>
-                    {address}
-                  </Typography>
+                  {attendanceToday && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Check-in time: {attendanceToday.check_in_time} {attendanceToday.check_out_time ? `| Check-out time: ${attendanceToday.check_out_time}` : ''}
+                    </Typography>
+                  )}
                 </Box>
-              )}
 
-              {/* Action Buttons */}
-              <Box sx={{ width: '100%', display: 'flex', gap: 2 }}>
-                {attendanceToday && attendanceToday.check_in_time && attendanceToday.check_out_time ? (
-                  <Button
-                    variant="contained"
-                    fullWidth
+                {/* Capture Location Section */}
+                {!gpsData ? (
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
                     size="large"
-                    disabled
-                    sx={{ py: 1.5, '&.Mui-disabled': { color: 'text.secondary', bgcolor: 'rgba(255,255,255,0.05)' } }}
+                    onClick={captureLocation}
+                    disabled={gpsLoading}
+                    startIcon={<MapPin />}
+                    sx={{ py: 1.5, mb: 2 }}
                   >
-                    Shift Completed Today
-                  </Button>
-                ) : isClockedIn ? (
-                  <Button
-                    variant="contained"
-                    color="secondary"
-                    fullWidth
-                    size="large"
-                    disabled={!gpsData}
-                    onClick={handleClockOut}
-                    sx={{ py: 1.5 }}
-                  >
-                    Clock Out
+                    {gpsLoading ? <CircularProgress size={24} /> : 'Fetch Live GPS Location'}
                   </Button>
                 ) : (
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    size="large"
-                    disabled={!gpsData}
-                    onClick={handleClockIn}
-                    sx={{ py: 1.5 }}
-                  >
-                    Clock In
-                  </Button>
+                  <Box sx={{ width: '100%', p: 2, bgcolor: 'background.default', borderRadius: 3, mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <CheckCircle size={16} color="#00f5d4" /> GPS Locked ({gpsData.accuracy.toFixed(1)}m Accuracy)
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" noWrap>
+                      {address}
+                    </Typography>
+                  </Box>
                 )}
-              </Box>
 
-            </CardContent>
-          </Card>
-        </Grid>
+                {/* Action Buttons */}
+                <Box sx={{ width: '100%', display: 'flex', gap: 2 }}>
+                  {attendanceToday && attendanceToday.check_in_time && attendanceToday.check_out_time ? (
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      disabled
+                      sx={{ py: 1.5, '&.Mui-disabled': { color: 'text.secondary', bgcolor: 'rgba(255,255,255,0.05)' } }}
+                    >
+                      Shift Completed Today
+                    </Button>
+                  ) : isClockedIn ? (
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      fullWidth
+                      size="large"
+                      disabled={!gpsData}
+                      onClick={handleClockOut}
+                      sx={{ py: 1.5 }}
+                    >
+                      Clock Out
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      disabled={!gpsData}
+                      onClick={handleClockIn}
+                      sx={{ py: 1.5 }}
+                    >
+                      Clock In
+                    </Button>
+                  )}
+                </Box>
+
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
 
         {/* History Table */}
-        <Grid item xs={12} md={7}>
+        <Grid item xs={12} md={isAdmin ? 12 : 7}>
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>
