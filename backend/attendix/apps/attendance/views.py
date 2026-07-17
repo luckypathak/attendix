@@ -582,17 +582,34 @@ class OvertimeViewSet(viewsets.ModelViewSet):
             # If still active, automatically check out employee
             if not session.check_out_time:
                 from django.utils import timezone
-                tz = timezone.get_current_timezone()
+                from .services import AttendanceService
+                from .models import AttendanceAuditLog
                 now_dt = timezone.localtime(timezone.now())
 
                 session.check_out_time = now_dt.time()
                 session.auto_checkout = True
-                session.checkout_reason = 'AUTO_CHECKOUT'
                 session.save()
 
                 attendance = session.attendance
                 attendance.check_out_time = session.check_out_time
                 attendance.save()
+                
+                # Recalculate metrics correctly based on shift
+                AttendanceService._recalculate_attendance_metrics(
+                    attendance,
+                    attendance.shift or AttendanceService.get_active_shift(ot.employee),
+                    attendance.date
+                )
+                
+                # Add Audit Log
+                AttendanceAuditLog.objects.create(
+                    session=session,
+                    user=request.user,
+                    old_value={"check_out_time": None},
+                    new_value={"check_out_time": str(session.check_out_time), "auto_checkout": True},
+                    reason="ADMIN_REJECTED_AUTO_CHECKOUT"
+                )
+
             else:
                 session.save()
 

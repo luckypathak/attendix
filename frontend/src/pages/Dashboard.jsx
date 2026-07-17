@@ -41,10 +41,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+    const interval = setInterval(() => {
+      fetchDashboardData(true);
+    }, 5000);
+    return () => clearInterval(interval);
   }, [isAdmin, selectedFirm]);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = async (isPolling = false) => {
+    if (!isPolling) setLoading(true);
     try {
       const statsRes = await api.get('/company/dashboard-stats/', { params: { firm: selectedFirm } });
       const statsData = statsRes.data.stats;
@@ -93,7 +97,7 @@ export default function Dashboard() {
                 <Card onClick={() => navigate('/attendance')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(0, 245, 212, 0.05)' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Present</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>{stats.attendance.present}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>{stats?.attendance?.present ?? 0}</Typography>
                   </CardContent>
                 </Card>
               </Grid>
@@ -101,7 +105,7 @@ export default function Dashboard() {
                 <Card onClick={() => navigate('/attendance')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(255, 159, 67, 0.05)' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Late</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'warning.main' }}>{stats.attendance.late}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'warning.main' }}>{stats?.attendance?.late ?? 0}</Typography>
                   </CardContent>
                 </Card>
               </Grid>
@@ -109,7 +113,7 @@ export default function Dashboard() {
                 <Card onClick={() => navigate('/attendance')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(231, 76, 60, 0.05)' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Absent</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'error.main' }}>{stats.attendance.absent}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'error.main' }}>{stats?.attendance?.absent ?? 0}</Typography>
                   </CardContent>
                 </Card>
               </Grid>
@@ -117,7 +121,7 @@ export default function Dashboard() {
                 <Card onClick={() => navigate('/attendance')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(157, 78, 221, 0.05)' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Half Day</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>{stats.attendance.half_day}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>{stats?.attendance?.half_day ?? 0}</Typography>
                   </CardContent>
                 </Card>
               </Grid>
@@ -131,11 +135,11 @@ export default function Dashboard() {
                         <MonitorOff size={18} color="#e74c3c" />
                         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Auto Checkouts</Typography>
                       </Box>
-                      <Typography variant="h4" sx={{ fontWeight: 800, color: '#e74c3c' }}>{stats.attendance.auto_checkouts_today}</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800, color: '#e74c3c' }}>{stats?.attendance?.auto_checkouts_today ?? 0}</Typography>
                       <Typography variant="caption" color="text.secondary">Today</Typography>
                     </Box>
                     <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="h5" sx={{ fontWeight: 800 }}>{stats.attendance.auto_checkouts_month}</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800 }}>{stats?.attendance?.auto_checkouts_month ?? 0}</Typography>
                       <Typography variant="caption" color="text.secondary">This Month</Typography>
                     </Box>
                   </CardContent>
@@ -149,17 +153,57 @@ export default function Dashboard() {
             <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Top Auto Checkouts</Typography>
-                {stats.attendance.top_auto_checkouts.length === 0 ? (
+                {(stats?.attendance?.top_auto_checkouts || []).length === 0 ? (
                   <Typography variant="body2" color="text.secondary">No auto checkouts this month.</Typography>
                 ) : (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    {stats.attendance.top_auto_checkouts.map((item, index) => (
+                    {(stats?.attendance?.top_auto_checkouts || []).map((item, index) => (
                       <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, bgcolor: 'background.default', borderRadius: 2 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{item.attendance__employee__username}</Typography>
                         <Chip label={`${item.count} times`} size="small" color="error" variant="outlined" />
                       </Box>
                     ))}
                   </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+
+          {/* Auto Checkout History Table */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Recent Auto Checkouts History</Typography>
+                {(stats?.attendance?.history || []).length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">No recent auto checkouts found.</Typography>
+                ) : (
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.1)' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Employee</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Shift</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Checkout Time</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Reason</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(stats?.attendance?.history || []).map((row, idx) => (
+                          <TableRow key={idx} hover>
+                            <TableCell sx={{ fontWeight: 600 }}>{row.employee}</TableCell>
+                            <TableCell>{row.date}</TableCell>
+                            <TableCell>{row.shift}</TableCell>
+                            <TableCell>{row.checkout_time || '--'}</TableCell>
+                            <TableCell>
+                              <Chip size="small" color={row.reason === 'AUTO_CHECKOUT_TIMEOUT' ? 'error' : row.reason === 'ADMIN_REJECTED_AUTO_CHECKOUT' ? 'warning' : 'default'} label={row.reason.replace(/_/g, ' ')} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
                 )}
               </CardContent>
             </Card>
@@ -174,25 +218,25 @@ export default function Dashboard() {
                   <Grid item xs={12} sm={4}>
                     <Box onClick={() => navigate('/reimbursements')} sx={{ cursor: 'pointer', p: 2, bgcolor: 'rgba(0, 245, 212, 0.05)', borderRadius: 2 }}>
                       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Total Paid</Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>{formatCurrency(stats.reimbursements.paid)}</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>{formatCurrency(stats?.reimbursements?.paid ?? 0)}</Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={4}>
                     <Box onClick={() => navigate('/reimbursements')} sx={{ cursor: 'pointer', p: 2, bgcolor: 'rgba(231, 76, 60, 0.05)', borderRadius: 2 }}>
                       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Pending</Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 800, color: 'error.main' }}>{formatCurrency(stats.reimbursements.pending)}</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: 'error.main' }}>{formatCurrency(stats?.reimbursements?.pending ?? 0)}</Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={4}>
                     <Box onClick={() => navigate('/reimbursements')} sx={{ cursor: 'pointer', p: 2, bgcolor: 'rgba(157, 78, 221, 0.05)', borderRadius: 2 }}>
                       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>This Month</Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>{formatCurrency(stats.reimbursements.this_month)}</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>{formatCurrency(stats?.reimbursements?.this_month ?? 0)}</Typography>
                     </Box>
                   </Grid>
                 </Grid>
                 <Box sx={{ width: '100%', height: 200, mt: 3 }}>
                   <ResponsiveContainer>
-                    <LineChart data={stats.reimbursements.graph}>
+                    <LineChart data={stats?.reimbursements?.graph || []}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="name" stroke="#6c757d" fontSize={12} />
                       <YAxis stroke="#6c757d" fontSize={12} tickFormatter={(value) => `₹${value}`} width={80} />
@@ -213,7 +257,7 @@ export default function Dashboard() {
                 <Card onClick={() => navigate('/payroll')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)' }, transition: 'all 0.2s', bgcolor: 'background.paper' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Total Advance Given</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800 }}>{formatCurrency(stats.advance_salary.given)}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800 }}>{formatCurrency(stats?.advance_salary?.given ?? 0)}</Typography>
                   </CardContent>
                 </Card>
               </Grid>
@@ -221,7 +265,7 @@ export default function Dashboard() {
                 <Card onClick={() => navigate('/payroll')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)' }, transition: 'all 0.2s', bgcolor: 'background.paper' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Pending Recovery</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'warning.main' }}>{formatCurrency(stats.advance_salary.pending_recovery)}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'warning.main' }}>{formatCurrency(stats?.advance_salary?.pending_recovery ?? 0)}</Typography>
                   </CardContent>
                 </Card>
               </Grid>
@@ -229,7 +273,7 @@ export default function Dashboard() {
                 <Card onClick={() => navigate('/payroll')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)' }, transition: 'all 0.2s', bgcolor: 'background.paper' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Recovered This Month</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>{formatCurrency(stats.advance_salary.recovered_this_month)}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>{formatCurrency(stats?.advance_salary?.recovered_this_month ?? 0)}</Typography>
                   </CardContent>
                 </Card>
               </Grid>
@@ -238,8 +282,8 @@ export default function Dashboard() {
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Payroll Status</Typography>
                     <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 800, color: 'success.main' }}>{stats.payroll.processed} <Typography component="span" variant="caption">Processed</Typography></Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 800, color: 'warning.main' }}>{stats.payroll.pending} <Typography component="span" variant="caption">Pending</Typography></Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 800, color: 'success.main' }}>{stats?.payroll?.processed ?? 0} <Typography component="span" variant="caption">Processed</Typography></Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 800, color: 'warning.main' }}>{stats?.payroll?.pending ?? 0} <Typography component="span" variant="caption">Pending</Typography></Typography>
                     </Box>
                   </CardContent>
                 </Card>
@@ -259,8 +303,8 @@ export default function Dashboard() {
                       <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Leaves</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 2, textAlign: 'center' }}>
-                      <Box><Typography variant="h6" sx={{ fontWeight: 800, color: 'warning.main' }}>{stats.leaves.pending}</Typography><Typography variant="caption" color="text.secondary">Pending</Typography></Box>
-                      <Box><Typography variant="h6" sx={{ fontWeight: 800, color: 'success.main' }}>{stats.leaves.approved}</Typography><Typography variant="caption" color="text.secondary">Approved</Typography></Box>
+                      <Box><Typography variant="h6" sx={{ fontWeight: 800, color: 'warning.main' }}>{stats?.leaves?.pending ?? 0}</Typography><Typography variant="caption" color="text.secondary">Pending</Typography></Box>
+                      <Box><Typography variant="h6" sx={{ fontWeight: 800, color: 'success.main' }}>{stats?.leaves?.approved ?? 0}</Typography><Typography variant="caption" color="text.secondary">Approved</Typography></Box>
                     </Box>
                   </CardContent>
                 </Card>
@@ -273,8 +317,8 @@ export default function Dashboard() {
                       <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Overtime</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 2, textAlign: 'center' }}>
-                      <Box><Typography variant="h6" sx={{ fontWeight: 800, color: 'warning.main' }}>{stats.overtime.pending}</Typography><Typography variant="caption" color="text.secondary">Pending</Typography></Box>
-                      <Box><Typography variant="h6" sx={{ fontWeight: 800, color: 'success.main' }}>{stats.overtime.approved}</Typography><Typography variant="caption" color="text.secondary">Approved</Typography></Box>
+                      <Box><Typography variant="h6" sx={{ fontWeight: 800, color: 'warning.main' }}>{stats?.overtime?.pending ?? 0}</Typography><Typography variant="caption" color="text.secondary">Pending</Typography></Box>
+                      <Box><Typography variant="h6" sx={{ fontWeight: 800, color: 'success.main' }}>{stats?.overtime?.approved ?? 0}</Typography><Typography variant="caption" color="text.secondary">Approved</Typography></Box>
                     </Box>
                   </CardContent>
                 </Card>

@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+content = """from django.core.management.base import BaseCommand
 from django.utils import timezone
 from attendix.apps.attendance.models import AttendanceSession, Overtime, AttendanceAuditLog
 from attendix.apps.attendance.services import AttendanceService
@@ -87,3 +87,6 @@ class Command(BaseCommand):
                         new_value={"check_out_time": str(session.check_out_time), "auto_checkout": True},
                         reason="AUTO_CHECKOUT_TIMEOUT"
                     )
+"""
+with open("../backend/attendix/apps/attendance/management/commands/cleanup_active_sessions.py", "w") as f:
+    f.write(content)

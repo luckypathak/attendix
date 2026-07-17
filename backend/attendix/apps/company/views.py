@@ -176,47 +176,84 @@ class DashboardStatsView(APIView):
                     "Late": late_count
                 })
 
+            # Ensure full schema contract
+            stats = {
+                "totalEmployees": total_employees,
+                "attendance": {
+                    "present": checked_in,
+                    "late": late,
+                    "half_day": half_day,
+                    "absent": absent,
+                    "auto_checkouts_today": auto_checkouts_today,
+                    "auto_checkouts_month": auto_checkouts_month,
+                    "top_auto_checkouts": top_checkouts
+                },
+                "reimbursements": {
+                    "paid": reims_paid,
+                    "pending": reims_pending,
+                    "this_month": reims_month,
+                    "graph": reims_graph
+                },
+                "advance_salary": {
+                    "given": adv_given,
+                    "pending_recovery": pending_recovery,
+                    "recovered_this_month": recovered_this_month
+                },
+                "payroll": {
+                    "processed": payroll_processed,
+                    "pending": payroll_pending
+                },
+                "leaves": {
+                    "pending": pending_leaves,
+                    "approved": approved_leaves,
+                    "rejected": rejected_leaves
+                },
+                "overtime": {
+                    "pending": pending_ot,
+                    "approved": approved_ot,
+                    "rejected": rejected_ot
+                }
+            }
+            
+            # Additional trend tracking logic
+            from datetime import timedelta
+            trends = []
+            for i in range(6, -1, -1):
+                d = today - timedelta(days=i)
+                trends.append({
+                    "date": d.strftime("%a"),
+                    "present": Attendance.objects.filter(date=d, **base_q).count()
+                })
+                
+            # Recent Auto Checkouts for the new Dashboard history
+            recent_auto_checkouts = AttendanceSession.objects.filter(
+                auto_checkout=True, **{f'attendance__{k}': v for k, v in base_q.items()}
+            ).select_related('attendance__employee', 'attendance__shift').order_by('-id')[:20]
+            
+            auto_checkout_history = []
+            for session in recent_auto_checkouts:
+                from attendix.apps.attendance.models import AttendanceAuditLog
+                reason = "AUTO_CHECKOUT"
+                log = AttendanceAuditLog.objects.filter(session=session).first()
+                if log:
+                    reason = log.reason
+                
+                auto_checkout_history.append({
+                    "employee": session.attendance.employee.username,
+                    "date": session.attendance.date.strftime("%Y-%m-%d"),
+                    "shift": session.attendance.shift.name if session.attendance.shift else 'Default',
+                    "checkout_time": str(session.check_out_time) if session.check_out_time else '',
+                    "reason": reason
+                })
+                
+            stats['attendance']['history'] = auto_checkout_history
+
             return Response({
                 "role": user.role,
-                "stats": {
-                    "totalEmployees": total_employees,
-                    "attendance": {
-                        "present": checked_in,
-                        "absent": absent,
-                        "half_day": half_day,
-                        "late": late,
-                        "auto_checkouts_today": auto_checkouts_today,
-                        "auto_checkouts_month": auto_checkouts_month,
-                        "top_auto_checkouts": top_auto_checkouts
-                    },
-                    "leaves": {
-                        "pending": pending_leaves,
-                        "approved": approved_leaves,
-                        "rejected": rejected_leaves
-                    },
-                    "overtime": {
-                        "pending": ot_pending,
-                        "approved": ot_approved,
-                        "rejected": ot_rejected
-                    },
-                    "reimbursements": {
-                        "paid": float(reimb_paid),
-                        "pending": float(reimb_pending),
-                        "this_month": float(reimb_month),
-                        "graph": reimb_graph
-                    },
-                    "advance_salary": {
-                        "given": float(adv_given),
-                        "pending_recovery": adv_pending,
-                        "recovered_this_month": float(adv_month_recovered)
-                    },
-                    "payroll": {
-                        "processed": payroll_processed,
-                        "pending": payroll_pending
-                    }
-                },
-                "trends": trends_data
+                "stats": stats,
+                "trends": trends
             })
+
         else:
             # Employee Dashboard Metrics
             from attendix.apps.attendance.models import Attendance
@@ -233,15 +270,84 @@ class DashboardStatsView(APIView):
             balances = LeaveBalance.objects.filter(employee=user)
             remaining_leaves_sum = sum(b.allocated - b.used for b in balances)
             remaining_leaves = f"{remaining_leaves_sum} Days Left"
+            # Ensure full schema contract
+            stats = {
+                "totalEmployees": total_employees,
+                "attendance": {
+                    "present": checked_in,
+                    "late": late,
+                    "half_day": half_day,
+                    "absent": absent,
+                    "auto_checkouts_today": auto_checkouts_today,
+                    "auto_checkouts_month": auto_checkouts_month,
+                    "top_auto_checkouts": top_checkouts
+                },
+                "reimbursements": {
+                    "paid": reims_paid,
+                    "pending": reims_pending,
+                    "this_month": reims_month,
+                    "graph": reims_graph
+                },
+                "advance_salary": {
+                    "given": adv_given,
+                    "pending_recovery": pending_recovery,
+                    "recovered_this_month": recovered_this_month
+                },
+                "payroll": {
+                    "processed": payroll_processed,
+                    "pending": payroll_pending
+                },
+                "leaves": {
+                    "pending": pending_leaves,
+                    "approved": approved_leaves,
+                    "rejected": rejected_leaves
+                },
+                "overtime": {
+                    "pending": pending_ot,
+                    "approved": approved_ot,
+                    "rejected": rejected_ot
+                }
+            }
+            
+            # Additional trend tracking logic
+            from datetime import timedelta
+            trends = []
+            for i in range(6, -1, -1):
+                d = today - timedelta(days=i)
+                trends.append({
+                    "date": d.strftime("%a"),
+                    "present": Attendance.objects.filter(date=d, **base_q).count()
+                })
+                
+            # Recent Auto Checkouts for the new Dashboard history
+            recent_auto_checkouts = AttendanceSession.objects.filter(
+                auto_checkout=True, **{f'attendance__{k}': v for k, v in base_q.items()}
+            ).select_related('attendance__employee', 'attendance__shift').order_by('-id')[:20]
+            
+            auto_checkout_history = []
+            for session in recent_auto_checkouts:
+                from attendix.apps.attendance.models import AttendanceAuditLog
+                reason = "AUTO_CHECKOUT"
+                log = AttendanceAuditLog.objects.filter(session=session).first()
+                if log:
+                    reason = log.reason
+                
+                auto_checkout_history.append({
+                    "employee": session.attendance.employee.username,
+                    "date": session.attendance.date.strftime("%Y-%m-%d"),
+                    "shift": session.attendance.shift.name if session.attendance.shift else 'Default',
+                    "checkout_time": str(session.check_out_time) if session.check_out_time else '',
+                    "reason": reason
+                })
+                
+            stats['attendance']['history'] = auto_checkout_history
+
             return Response({
                 "role": user.role,
-                "stats": {
-                    "checkedInTime": checked_in_time,
-                    "checkedOutTime": checked_out_time,
-                    "taskCompleteness": task_completeness,
-                    "remainingLeaves": remaining_leaves
-                }
+                "stats": stats,
+                "trends": trends
             })
+
 
     def get(self, request):
         user = request.user
@@ -313,16 +419,84 @@ class DashboardStatsView(APIView):
                     "Late": late_count
                 })
 
+            # Ensure full schema contract
+            stats = {
+                "totalEmployees": total_employees,
+                "attendance": {
+                    "present": checked_in,
+                    "late": late,
+                    "half_day": half_day,
+                    "absent": absent,
+                    "auto_checkouts_today": auto_checkouts_today,
+                    "auto_checkouts_month": auto_checkouts_month,
+                    "top_auto_checkouts": top_checkouts
+                },
+                "reimbursements": {
+                    "paid": reims_paid,
+                    "pending": reims_pending,
+                    "this_month": reims_month,
+                    "graph": reims_graph
+                },
+                "advance_salary": {
+                    "given": adv_given,
+                    "pending_recovery": pending_recovery,
+                    "recovered_this_month": recovered_this_month
+                },
+                "payroll": {
+                    "processed": payroll_processed,
+                    "pending": payroll_pending
+                },
+                "leaves": {
+                    "pending": pending_leaves,
+                    "approved": approved_leaves,
+                    "rejected": rejected_leaves
+                },
+                "overtime": {
+                    "pending": pending_ot,
+                    "approved": approved_ot,
+                    "rejected": rejected_ot
+                }
+            }
+            
+            # Additional trend tracking logic
+            from datetime import timedelta
+            trends = []
+            for i in range(6, -1, -1):
+                d = today - timedelta(days=i)
+                trends.append({
+                    "date": d.strftime("%a"),
+                    "present": Attendance.objects.filter(date=d, **base_q).count()
+                })
+                
+            # Recent Auto Checkouts for the new Dashboard history
+            recent_auto_checkouts = AttendanceSession.objects.filter(
+                auto_checkout=True, **{f'attendance__{k}': v for k, v in base_q.items()}
+            ).select_related('attendance__employee', 'attendance__shift').order_by('-id')[:20]
+            
+            auto_checkout_history = []
+            for session in recent_auto_checkouts:
+                from attendix.apps.attendance.models import AttendanceAuditLog
+                reason = "AUTO_CHECKOUT"
+                log = AttendanceAuditLog.objects.filter(session=session).first()
+                if log:
+                    reason = log.reason
+                
+                auto_checkout_history.append({
+                    "employee": session.attendance.employee.username,
+                    "date": session.attendance.date.strftime("%Y-%m-%d"),
+                    "shift": session.attendance.shift.name if session.attendance.shift else 'Default',
+                    "checkout_time": str(session.check_out_time) if session.check_out_time else '',
+                    "reason": reason
+                })
+                
+            stats['attendance']['history'] = auto_checkout_history
+
             return Response({
                 "role": user.role,
-                "stats": {
-                    "totalEmployees": total_employees,
-                    "checkedIn": checked_in,
-                    "late": late,
-                    "pendingLeaves": pending_leaves
-                },
-                "trends": trends_data
+                "stats": stats,
+                "trends": trends
             })
+
         else:
             # Employee Dashboard Metrics
             attendance_today = Attendance.objects.filter(
@@ -344,12 +518,81 @@ class DashboardStatsView(APIView):
             remaining_leaves_sum = sum(b.allocated - b.used for b in balances)
             remaining_leaves = f"{remaining_leaves_sum} Days Left"
 
+            # Ensure full schema contract
+            stats = {
+                "totalEmployees": total_employees,
+                "attendance": {
+                    "present": checked_in,
+                    "late": late,
+                    "half_day": half_day,
+                    "absent": absent,
+                    "auto_checkouts_today": auto_checkouts_today,
+                    "auto_checkouts_month": auto_checkouts_month,
+                    "top_auto_checkouts": top_checkouts
+                },
+                "reimbursements": {
+                    "paid": reims_paid,
+                    "pending": reims_pending,
+                    "this_month": reims_month,
+                    "graph": reims_graph
+                },
+                "advance_salary": {
+                    "given": adv_given,
+                    "pending_recovery": pending_recovery,
+                    "recovered_this_month": recovered_this_month
+                },
+                "payroll": {
+                    "processed": payroll_processed,
+                    "pending": payroll_pending
+                },
+                "leaves": {
+                    "pending": pending_leaves,
+                    "approved": approved_leaves,
+                    "rejected": rejected_leaves
+                },
+                "overtime": {
+                    "pending": pending_ot,
+                    "approved": approved_ot,
+                    "rejected": rejected_ot
+                }
+            }
+            
+            # Additional trend tracking logic
+            from datetime import timedelta
+            trends = []
+            for i in range(6, -1, -1):
+                d = today - timedelta(days=i)
+                trends.append({
+                    "date": d.strftime("%a"),
+                    "present": Attendance.objects.filter(date=d, **base_q).count()
+                })
+                
+            # Recent Auto Checkouts for the new Dashboard history
+            recent_auto_checkouts = AttendanceSession.objects.filter(
+                auto_checkout=True, **{f'attendance__{k}': v for k, v in base_q.items()}
+            ).select_related('attendance__employee', 'attendance__shift').order_by('-id')[:20]
+            
+            auto_checkout_history = []
+            for session in recent_auto_checkouts:
+                from attendix.apps.attendance.models import AttendanceAuditLog
+                reason = "AUTO_CHECKOUT"
+                log = AttendanceAuditLog.objects.filter(session=session).first()
+                if log:
+                    reason = log.reason
+                
+                auto_checkout_history.append({
+                    "employee": session.attendance.employee.username,
+                    "date": session.attendance.date.strftime("%Y-%m-%d"),
+                    "shift": session.attendance.shift.name if session.attendance.shift else 'Default',
+                    "checkout_time": str(session.check_out_time) if session.check_out_time else '',
+                    "reason": reason
+                })
+                
+            stats['attendance']['history'] = auto_checkout_history
+
             return Response({
                 "role": user.role,
-                "stats": {
-                    "checkedInTime": checked_in_time,
-                    "checkedOutTime": checked_out_time,
-                    "taskCompleteness": task_completeness,
-                    "remainingLeaves": remaining_leaves
-                }
+                "stats": stats,
+                "trends": trends
             })
+
