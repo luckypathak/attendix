@@ -161,6 +161,13 @@ class AttendanceSession(SoftDeleteModel):
     regular_hours = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
     ot_hours = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
 
+    # Shift Continuation & Overtime Request fields
+    continue_shift = models.BooleanField(default=False)
+    continue_clicked_at = models.DateTimeField(null=True, blank=True)
+    ot_requested = models.BooleanField(default=False)
+    ot_requested_at = models.DateTimeField(null=True, blank=True)
+    checkout_missed_count = models.IntegerField(default=0)
+
     # Check-in GPS
     check_in_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     check_in_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)

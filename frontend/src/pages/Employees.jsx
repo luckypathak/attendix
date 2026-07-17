@@ -403,6 +403,7 @@ export default function Employees() {
                   <TableCell sx={{ fontWeight: 700 }}>Shift timing</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>PF Deduction</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
+                  {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Missed Checkouts</TableCell>}
                   {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Base Salary (₹)</TableCell>}
                   {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Hourly Rate (₹)</TableCell>}
                   {hasEditRights && <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>}
@@ -411,7 +412,7 @@ export default function Employees() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 10 : 9} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={isAdmin ? 11 : 9} align="center" sx={{ py: 6 }}>
                       <CircularProgress size={32} />
                     </TableCell>
                   </TableRow>
@@ -467,11 +468,21 @@ export default function Employees() {
                           sx={{ fontWeight: 700, fontSize: '0.65rem' }}
                         />
                       </TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <Chip 
+                            label={`${emp.checkout_missed_count || 0} Missed`} 
+                            size="small" 
+                            color={emp.checkout_missed_count >= 3 ? "error" : (emp.checkout_missed_count > 0 ? "warning" : "success")}
+                            sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                          />
+                        </TableCell>
+                      )}
                       {isAdmin && <TableCell sx={{ fontWeight: 600 }}>₹{parseFloat(emp.base_salary).toLocaleString('en-IN')}</TableCell>}
                       {isAdmin && <TableCell>₹{parseFloat(emp.hourly_rate).toFixed(2)}/hr</TableCell>}
                       {hasEditRights && (
                         <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                             <Button 
                               variant="outlined" 
                               size="small"
@@ -479,6 +490,23 @@ export default function Employees() {
                             >
                               Edit
                             </Button>
+                            {isAdmin && emp.checkout_missed_count > 0 && (
+                              <Button
+                                variant="contained"
+                                color="warning"
+                                size="small"
+                                onClick={async () => {
+                                  try {
+                                    await api.post(`/employees/${emp.id}/reset-missed-counter/`);
+                                    fetchEmployees();
+                                  } catch (e) {
+                                    alert("Failed to reset counter.");
+                                  }
+                                }}
+                              >
+                                Reset Strikes
+                              </Button>
+                            )}
                             {isAdmin && (
                               <Button 
                                 variant="outlined" 

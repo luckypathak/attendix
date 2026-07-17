@@ -455,19 +455,75 @@ export default function Attendance() {
                 )}
 
                 {/* Action Buttons */}
-                <Box sx={{ width: '100%', display: 'flex', gap: 2 }}>
+                <Box sx={{ width: '100%', display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                   {isClockedIn ? (
-                    <Button
-                      variant="contained"
-                      color={activeSession?.ot_status === 'PENDING' ? 'warning' : 'secondary'}
-                      fullWidth
-                      size="large"
-                      disabled={!gpsData || activeSession?.ot_status === 'PENDING'}
-                      onClick={handleClockOut}
-                      sx={{ py: 1.5 }}
-                    >
-                      {activeSession?.ot_status === 'PENDING' ? 'Waiting for OT Approval' : 'Clock Out'}
-                    </Button>
+                    <>
+                      {/* Check if in shift window and user hasn't made a choice yet */}
+                      {attendanceToday?.in_shift_window && !activeSession?.continue_shift && !activeSession?.ot_requested ? (
+                        <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <Alert severity="info" sx={{ width: '100%' }}>
+                            Your shift is ending soon. Are you continuing to complete your shift, or requesting overtime?
+                          </Alert>
+                          <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                            <Button
+                              variant="contained"
+                              color="primary"
+                              fullWidth
+                              size="large"
+                              onClick={async () => {
+                                try {
+                                  await api.post(`/attendance/records/${attendanceToday.id}/continue-shift/`);
+                                  fetchHistory();
+                                } catch (e) {
+                                  alert(getError(e, 'Failed to continue shift'));
+                                }
+                              }}
+                            >
+                              Continue Shift
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              color="warning"
+                              fullWidth
+                              size="large"
+                              onClick={async () => {
+                                try {
+                                  await api.post(`/attendance/records/${attendanceToday.id}/request-overtime/`);
+                                  fetchHistory();
+                                  fetchOvertimeRequests();
+                                } catch (e) {
+                                  alert(getError(e, 'Failed to request overtime'));
+                                }
+                              }}
+                            >
+                              Request Overtime
+                            </Button>
+                          </Box>
+                          <Button
+                            variant="outlined"
+                            color="secondary"
+                            fullWidth
+                            size="large"
+                            disabled={!gpsData}
+                            onClick={handleClockOut}
+                          >
+                            Clock Out Now
+                          </Button>
+                        </Box>
+                      ) : (
+                        <Button
+                          variant="contained"
+                          color={activeSession?.ot_status === 'PENDING' ? 'warning' : 'secondary'}
+                          fullWidth
+                          size="large"
+                          disabled={!gpsData || activeSession?.ot_status === 'PENDING'}
+                          onClick={handleClockOut}
+                          sx={{ py: 1.5 }}
+                        >
+                          {activeSession?.ot_status === 'PENDING' ? 'Waiting for OT Approval' : 'Clock Out'}
+                        </Button>
+                      )}
+                    </>
                   ) : (
                     <Button
                       variant="contained"

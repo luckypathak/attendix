@@ -38,6 +38,8 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source='employee.username', read_only=True)
     shift_name = serializers.CharField(source='shift.name', read_only=True)
+    shift_start_time = serializers.TimeField(source='shift.start_time', read_only=True)
+    shift_end_time = serializers.TimeField(source='shift.end_time', read_only=True)
     sessions = AttendanceSessionSerializer(many=True, read_only=True)
 
     class Meta:
@@ -50,6 +52,24 @@ class AttendanceSerializer(serializers.ModelSerializer):
             ret['check_in_time'] = instance.check_in_time.strftime('%I:%M %p')
         if instance.check_out_time:
             ret['check_out_time'] = instance.check_out_time.strftime('%I:%M %p')
+        # Add a flag to indicate if we are in the shift end window
+        from django.utils import timezone
+        import datetime
+        ret['in_shift_window'] = False
+        if instance.shift and instance.shift.end_time:
+            now = timezone.now().time()
+            # simple calculation, assuming no midnight crossing for shift_end for this check
+            today = datetime.date.today()
+            dt_now = datetime.datetime.combine(today, now)
+            dt_end = datetime.datetime.combine(today, instance.shift.end_time)
+            
+            # window: 15 mins before to 15 mins after
+            start_window = dt_end - datetime.timedelta(minutes=15)
+            end_window = dt_end + datetime.timedelta(minutes=15)
+            
+            if start_window <= dt_now <= end_window:
+                ret['in_shift_window'] = True
+                
         return ret
 
 

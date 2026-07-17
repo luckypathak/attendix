@@ -58,7 +58,8 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
             'pan_number', 'bank_account_no', 'bank_ifsc_code', 'created_at', 'updated_at',
             'password', 'firm_id', 'firm_name', 'shift_id', 'shift_name', 'pf_deduction',
             'pf_type', 'pf_value', 'firm_allocations',
-            'shift_start_time', 'shift_end_time', 'allowed_leaves', 'used_leaves'
+            'shift_start_time', 'shift_end_time', 'allowed_leaves', 'used_leaves',
+            'checkout_missed_count'
         )
 
     def to_representation(self, instance):

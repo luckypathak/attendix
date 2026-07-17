@@ -120,6 +120,66 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         ).order_by('-date')
         return Response(AttendanceSerializer(records, many=True, context={'request': request}).data)
 
+    @action(detail=True, methods=['post'], url_path='continue-shift')
+    def continue_shift(self, request, pk=None):
+        attendance = self.get_object()
+        session = attendance.sessions.order_by('-created_at').first()
+        if not session or session.check_out_time:
+            return Response({"detail": "No active session found."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        session.continue_shift = True
+        session.continue_clicked_at = timezone.now()
+        session.save()
+        return Response({"detail": "Shift continued successfully."}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='request-overtime')
+    def request_overtime(self, request, pk=None):
+        from attendix.apps.notifications.services import NotificationService
+        attendance = self.get_object()
+        session = attendance.sessions.order_by('-created_at').first()
+        if not session or session.check_out_time:
+            return Response({"detail": "No active session found."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if session.ot_requested:
+             return Response({"detail": "Overtime already requested."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # We will create the OT request with 0 hours initially; the background checker updates it
+        ot_req, created = Overtime.objects.get_or_create(
+            employee=attendance.employee,
+            attendance=attendance,
+            session=session,
+            date=attendance.date,
+            defaults={
+                'hours': 0.0,
+                'status': 'PENDING',
+                'shift_start': getattr(attendance.shift, 'start_time', None),
+                'shift_end': getattr(attendance.shift, 'end_time', None),
+                'actual_current_time': timezone.now().time(),
+                'extra_working_time': 0.0
+            }
+        )
+
+        session.ot_requested = True
+        session.ot_requested_at = timezone.now()
+        session.ot_request_created = True
+        session.ot_status = 'PENDING'
+        session.save()
+        
+        # Notify admins
+        admins = User.objects.filter(company=attendance.employee.company, role__in=['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'])
+        profile = getattr(attendance.employee, 'employee_profile', None)
+        if profile and profile.manager:
+             admins = admins | User.objects.filter(id=profile.manager.id)
+        
+        for admin in admins.distinct():
+            NotificationService.create_in_app_notification(
+                recipient=admin,
+                title="Overtime Request",
+                body=f"Employee {attendance.employee.username} requested overtime approval."
+            )
+            
+        return Response({"detail": "Overtime requested successfully."}, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=['post'], url_path='grant-ot')
     def grant_ot(self, request, pk=None):
         if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:

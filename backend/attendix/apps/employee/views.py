@@ -126,6 +126,16 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
         return Response({"detail": f"Successfully deleted {len(employee_ids)} employees and their related records."}, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='reset-missed-counter')
+    def reset_missed_counter(self, request, pk=None):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            return Response({"detail": "Only admins can reset the missed checkout counter."}, status=status.HTTP_403_FORBIDDEN)
+            
+        profile = self.get_object()
+        profile.checkout_missed_count = 0
+        profile.save(update_fields=['checkout_missed_count'])
+        return Response({"detail": "Missed checkout counter reset successfully."}, status=status.HTTP_200_OK)
+
     def perform_destroy(self, instance):
         if instance.user:
             user_id = instance.user_id

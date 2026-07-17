@@ -187,7 +187,6 @@ class AttendanceService:
         return attendance
 
     @classmethod
-    @classmethod
     def _recalculate_attendance_metrics(cls, attendance, shift, current_date):
         # Calculate cumulative metrics across all completed sessions
         sessions = attendance.sessions.filter(check_out_time__isnull=False).order_by('check_in_time')
@@ -223,7 +222,13 @@ class AttendanceService:
 
         # Half-day rule: If worked hours is less than shift duration (or 6.0 hrs fallback), downgrade status to HALF_DAY
         shift_hours = float(shift.duration_hours) if shift else 9.0
-        if total_worked_hours < shift_hours:
+
+        # Check if user has 3 or more auto-checkouts (3 strikes rule)
+        profile = getattr(attendance.employee, 'employee_profile', None)
+        has_three_strikes = profile and profile.checkout_missed_count >= 3
+        has_auto_checkout_today = attendance.sessions.filter(auto_checkout=True).exists()
+
+        if total_worked_hours < shift_hours or (has_three_strikes and has_auto_checkout_today):
             attendance.status = Attendance.Statuses.HALF_DAY
         else:
             # If they completed the full shift, restore status from HALF_DAY to PRESENT or LATE
@@ -270,6 +275,10 @@ class AttendanceService:
                 session.regular_hours = 0.0
                 session.ot_hours = session_duration
 
+            # Continue Shift Rule: Clicks Continue Shift -> OT = 0
+            if session.continue_shift:
+                session.ot_hours = 0.0
+
             # If OT status is rejected or not approved, do not count the OT hours
             if session.ot_status == 'REJECTED':
                 session.ot_hours = 0.0
@@ -282,7 +291,7 @@ class AttendanceService:
             # Synchronize Overtime request hours if it exists
             ot_req = getattr(session, 'overtime_request', None)
             if ot_req:
-                if session.ot_status == 'REJECTED':
+                if session.ot_status == 'REJECTED' or session.continue_shift:
                     ot_req.hours = 0.0
                 else:
                     ot_req.hours = session.ot_hours
@@ -294,12 +303,13 @@ class AttendanceService:
     @classmethod
     def check_active_overtimes_and_autocheckout(cls):
         """
-        Periodically checks active attendance sessions, detects if shift end has passed,
-        creates OT requests, and auto checks out employees when the grace period expires.
+        Periodically checks active attendance sessions, detects shift completion window,
+        creates OT requests, or auto checks out if employee fails to take action.
         """
         from django.utils import timezone
         import datetime
         from attendix.apps.attendance.models import Overtime
+        from attendix.apps.notifications.services import NotificationService
 
         tz = timezone.get_current_timezone()
         now_dt = timezone.localtime(timezone.now())
@@ -325,67 +335,52 @@ class AttendanceService:
             # Make shift_end_dt aware in local timezone
             shift_end_dt = timezone.make_aware(shift_end_dt, tz)
 
-            # 1. Check if shift end has passed
-            if now_dt >= shift_end_dt:
-                # Calculate running extra time
-                extra_working_time = round((now_dt - shift_end_dt).total_seconds() / 3600.0, 2)
-                if extra_working_time < 0.0:
-                    extra_working_time = 0.0
+            # Define window: 15 minutes before shift end to 15 minutes after shift end
+            window_start = shift_end_dt - datetime.timedelta(minutes=15)
+            window_end = shift_end_dt + datetime.timedelta(minutes=15)
 
-                # Check if OT request already exists
-                ot_req = getattr(session, 'overtime_request', None)
-                if not ot_req:
-                    # Create a new Overtime request
-                    ot_req = Overtime.objects.create(
-                        employee=employee,
-                        attendance=attendance,
-                        session=session,
-                        date=attendance.date,
-                        hours=extra_working_time,
-                        status='PENDING',
-                        shift_start=shift_start,
-                        shift_end=shift_end,
-                        actual_current_time=now_dt.time(),
-                        extra_working_time=extra_working_time
-                    )
-                    session.ot_request_created = True
-                    session.ot_status = 'PENDING'
+            # 1. If we are past the window end, and the employee took no action (forgot checkout)
+            if now_dt > window_end:
+                if not session.continue_shift and not session.ot_requested:
+                    # Auto checkout due to negligence
+                    profile = getattr(employee, 'employee_profile', None)
+                    missed_count = 1
+                    if profile:
+                        profile.checkout_missed_count += 1
+                        profile.save()
+                        missed_count = profile.checkout_missed_count
+
+                    session.check_out_time = window_end.time()
+                    session.auto_checkout = True
+                    session.checkout_reason = 'AUTO_CHECKOUT'
+                    session.checkout_missed_count = missed_count
                     session.save()
-                    print(f"Created pending OT request for {employee.username} on session {session.id}")
-                else:
-                    # If pending, update the running extra working hours
-                    if ot_req.status == 'PENDING':
-                        ot_req.hours = extra_working_time
-                        ot_req.extra_working_time = extra_working_time
-                        ot_req.actual_current_time = now_dt.time()
-                        ot_req.save()
 
-                # 2. Check if grace period has expired (Auto Checkout)
-                # If OT request is still PENDING after grace period, reject it and auto checkout
-                if session.ot_status == 'PENDING':
-                    grace_mins = shift.grace_period_minutes
-                    timeout_dt = shift_end_dt + datetime.timedelta(minutes=grace_mins)
+                    attendance.check_out_time = session.check_out_time
+                    attendance.save()
 
-                    if now_dt > timeout_dt:
-                        print(f"Grace period expired for {employee.username}. Triggering auto-checkout.")
-                        # Reject OT Request
-                        ot_req.status = 'REJECTED'
-                        ot_req.hours = 0.0
-                        ot_req.save()
+                    # Notify admins
+                    admins = User.objects.filter(company=employee.company, role__in=['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'])
+                    if profile and profile.manager:
+                        admins = admins | User.objects.filter(id=profile.manager.id)
+                    admins = admins.distinct()
 
-                        # Auto checkout session
-                        session.check_out_time = timeout_dt.time()
-                        session.auto_checkout = True
-                        session.checkout_reason = 'AUTO_CHECKOUT'
-                        session.ot_status = 'REJECTED'
-                        session.save()
+                    for admin in admins:
+                        NotificationService.create_in_app_notification(
+                            recipient=admin,
+                            title="Employee Auto Checked Out",
+                            body=f"Employee {employee.username} did not check out before shift end. System performed automatic checkout."
+                        )
 
-                        # Update parent attendance
-                        attendance.check_out_time = session.check_out_time
-                        attendance.save()
+                        if missed_count >= 3:
+                            NotificationService.create_in_app_notification(
+                                recipient=admin,
+                                title="Repeated Checkout Violation",
+                                body=f"Employee {employee.username} has failed to check out properly three times. Attendance marked as HALF_DAY."
+                            )
 
-                        # Recalculate metrics
-                        cls._recalculate_attendance_metrics(attendance, shift, attendance.date)
+                    # Recalculate metrics
+                    cls._recalculate_attendance_metrics(attendance, shift, attendance.date)
 
     @classmethod
     def process_auto_checkout(cls):
