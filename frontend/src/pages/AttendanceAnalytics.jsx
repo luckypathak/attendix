@@ -12,7 +12,7 @@ import {
   Calendar, MapPin, User, Building, Clock, ChevronDown,
   ChevronUp, Search, RefreshCw, BarChart2, Eye
 } from 'lucide-react';
-import api from '../services/api';
+import api, { getMediaUrl } from '../services/api';
 import { formatDate } from '../utils/format';
 
 export default function AttendanceAnalytics() {
@@ -38,7 +38,11 @@ export default function AttendanceAnalytics() {
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null);
 
   useEffect(() => {
-    setSelectedBranch(selectedFirm);
+    if (selectedFirm && selectedFirm !== 'ALL') {
+      setSelectedBranch(parseInt(selectedFirm));
+    } else {
+      setSelectedBranch('ALL');
+    }
     fetchFilterOptions();
   }, [selectedFirm]);
 
@@ -163,7 +167,7 @@ export default function AttendanceAnalytics() {
               >
                 <MenuItem value="ALL">All Employees</MenuItem>
                 {employees.map((emp) => (
-                  <MenuItem key={emp.id} value={emp.id}>{emp.username}</MenuItem>
+                  <MenuItem key={emp.id} value={emp.user_id}>{emp.username}</MenuItem>
                 ))}
               </TextField>
             </Grid>
@@ -395,10 +399,10 @@ export default function AttendanceAnalytics() {
                                               {rec.captured_image ? (
                                                 <Tooltip title="Click to open image in new tab">
                                                   <img
-                                                    src={rec.captured_image}
+                                                    src={getMediaUrl(rec.captured_image)}
                                                     alt="identity"
                                                     style={{ width: 44, height: 44, borderRadius: '6px', objectFit: 'cover', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
-                                                    onClick={() => window.open(rec.captured_image, '_blank')}
+                                                    onClick={() => window.open(getMediaUrl(rec.captured_image), '_blank')}
                                                   />
                                                 </Tooltip>
                                               ) : '--'}

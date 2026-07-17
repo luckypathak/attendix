@@ -4,6 +4,15 @@ import { logout } from '../features/authSlice';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
+export const getMediaUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  const base = API_URL.split('/api/v1')[0];
+  return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {

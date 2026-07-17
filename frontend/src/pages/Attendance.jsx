@@ -8,7 +8,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField
 } from '@mui/material';
 import { MapPin, ShieldAlert, CheckCircle, Clock } from 'lucide-react';
-import api from '../services/api';
+import api, { getMediaUrl } from '../services/api';
 import { formatDate } from '../utils/format';
 
 export default function Attendance() {
@@ -476,11 +476,11 @@ export default function Attendance() {
                           {isAdmin && <TableCell sx={{ fontWeight: 600 }}>{rec.employee_name}</TableCell>}
                           <TableCell>
                             {rec.captured_image ? (
-                              <img 
-                                src={rec.captured_image} 
-                                alt="Checkin" 
-                                style={{ width: 40, height: 40, borderRadius: '6px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.08)' }} 
-                              />
+                               <img 
+                                 src={getMediaUrl(rec.captured_image)} 
+                                 alt="Checkin" 
+                                 style={{ width: 40, height: 40, borderRadius: '6px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.08)' }} 
+                               />
                             ) : '--'}
                           </TableCell>
                           <TableCell>{formatDate(rec.date)}</TableCell>
