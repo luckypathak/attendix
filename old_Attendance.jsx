@@ -1,45 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { useOutletContext } from 'react-router-dom';
 import { 
   Box, Card, CardContent, Grid, Button, Typography, 
   CircularProgress, Alert, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Paper, Chip,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Accordion, AccordionSummary, AccordionDetails, Tooltip,
-  IconButton, Pagination, Select, MenuItem, InputLabel, FormControl
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField
 } from '@mui/material';
-import { MapPin, ShieldAlert, CheckCircle, Clock, ChevronDown, ChevronRight, X, Maximize2 } from 'lucide-react';
+import { MapPin, ShieldAlert, CheckCircle, Clock } from 'lucide-react';
 import api, { getMediaUrl } from '../services/api';
 import { formatDate } from '../utils/format';
 import EditAttendanceModal from '../components/EditAttendanceModal';
-
-
-// --- STYLED COMPONENTS & HELPERS ---
-const StatusChip = ({ status }) => {
-  const colors = {
-    PRESENT: 'success',
-    LATE: 'warning',
-    HALF_DAY: 'primary',
-    ABSENT: 'error',
-    PENDING: 'default'
-  };
-  return <Chip label={status || 'UNKNOWN'} color={colors[status] || 'default'} size="small" sx={{ fontWeight: 600 }} />;
-};
-
-const PhotoPreview = ({ url, label, onClick }) => {
-  if (!url) return <Typography variant="caption" color="text.secondary">No Photo</Typography>;
-  return (
-    <Box 
-      onClick={() => onClick(url)}
-      sx={{ 
-        width: 40, height: 40, borderRadius: 2, overflow: 'hidden', 
-        border: '2px solid rgba(255,255,255,0.1)', cursor: 'pointer',
-        transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.1)' }
-      }}
-    >
-      <img src={getMediaUrl(url)} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-    </Box>
-  );
-};
 
 export default function Attendance() {
   const { user } = useSelector((state) => state.auth);
@@ -55,38 +26,6 @@ export default function Attendance() {
   const [attendanceToday, setAttendanceToday] = useState(null);
   const [history, setHistory] = useState([]);
   const [adminRecords, setAdminRecords] = useState([]);
-  // --- FILTERS & PAGINATION ---
-  const [filters, setFilters] = useState({
-    date: '', startDate: '', endDate: '', employee: '', status: '', autoCheckout: '', overtimePending: ''
-  });
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [groupedRecords, setGroupedRecords] = useState({});
-  const [expandedDates, setExpandedDates] = useState({});
-  const [expandedEmployees, setExpandedEmployees] = useState({});
-  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
-  const [viewPhotoUrl, setViewPhotoUrl] = useState('');
-  const [adminLoading, setAdminLoading] = useState(false);
-
-  const groupRecords = (records) => {
-    const grouped = {};
-    records.forEach(rec => {
-      const d = rec.date;
-      if (!grouped[d]) grouped[d] = [];
-      grouped[d].push(rec);
-    });
-    setGroupedRecords(grouped);
-  };
-
-  const toggleDate = (date) => setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }));
-  const toggleEmployee = (date, empId) => {
-    const key = `${date}_${empId}`;
-    setExpandedEmployees(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-  const openPhoto = (url) => { setViewPhotoUrl(getMediaUrl(url)); setPhotoViewerOpen(true); };
-  const handleFilterChange = (e) => { setFilters(prev => ({ ...prev, [e.target.name]: e.target.value })); setPage(1); };
-
   const [overtimeRequests, setOvertimeRequests] = useState([]);
   const [otModalOpen, setOtModalOpen] = useState(false);
   const [selectedRecordForOt, setSelectedRecordForOt] = useState(null);
@@ -118,14 +57,20 @@ export default function Attendance() {
   useEffect(() => {
     fetchHistory();
     fetchOvertimeRequests();
-    if (isAdmin) fetchAdminRecords();
+    if (isAdmin) {
+      fetchAdminRecords();
+    }
+
     const interval = setInterval(() => {
       fetchHistory();
       fetchOvertimeRequests();
-      if (isAdmin) fetchAdminRecords();
-    }, 5000);
+      if (isAdmin) {
+        fetchAdminRecords();
+      }
+    }, 5000); // 5 seconds polling for real-time dashboard updates
+
     return () => clearInterval(interval);
-  }, [isAdmin, selectedFirm, page, filters]);
+  }, [isAdmin, selectedFirm]);
 
   const fetchHistory = async () => {
     try {
@@ -164,22 +109,11 @@ export default function Attendance() {
   };
 
   const fetchAdminRecords = async () => {
-    if (!isAdmin) return;
-    setAdminLoading(true);
     try {
-      const params = { firm: selectedFirm, limit: pageSize, offset: (page - 1) * pageSize, ...filters };
-      Object.keys(params).forEach(key => {
-        if (params[key] === '' || params[key] === null) delete params[key];
-      });
-      const response = await api.get('/attendance/records/', { params });
-      const results = response.data.results || response.data;
-      setAdminRecords(results);
-      setTotalRecords(response.data.count || results.length);
-      groupRecords(results);
+      const response = await api.get('/attendance/records/', { params: { firm: selectedFirm } });
+      setAdminRecords(response.data.results || response.data);
     } catch (e) {
       console.error(e);
-    } finally {
-      setAdminLoading(false);
     }
   };
 
@@ -1022,16 +956,6 @@ export default function Attendance() {
           }}
         />
       )}
-
-      <Dialog open={photoViewerOpen} onClose={() => setPhotoViewerOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Photo Preview
-          <IconButton onClick={() => setPhotoViewerOpen(false)}><X /></IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0, bgcolor: '#000', display: 'flex', justifyContent: 'center' }}>
-          {viewPhotoUrl && <img src={viewPhotoUrl} alt="Preview" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} />}
-        </DialogContent>
-      </Dialog>
     </Box>
   );
 }

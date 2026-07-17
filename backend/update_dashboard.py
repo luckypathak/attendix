@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import sys
+
+def update_file():
+    with open("../frontend/src/pages/Dashboard.jsx", "w") as f:
+        f.write("""import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { 
@@ -379,3 +383,5 @@ export default function Dashboard() {
     </Box>
   );
 }
+""")
+update_file()

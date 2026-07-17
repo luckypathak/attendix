@@ -272,9 +272,20 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return None
             
         if 'check_in_time' in request.data:
-            session.check_in_time = parse_time(request.data['check_in_time'])
+            parsed = parse_time(request.data['check_in_time'])
+            if not parsed:
+                return Response({"success": False, "message": "Invalid check-in time format."}, status=status.HTTP_400_BAD_REQUEST)
+            session.check_in_time = parsed
+            
         if 'check_out_time' in request.data:
-            session.check_out_time = parse_time(request.data['check_out_time'])
+            parsed = parse_time(request.data['check_out_time'])
+            session.check_out_time = parsed
+            
+        # Validate logic: check-out cannot be before check-in
+        if session.check_in_time and session.check_out_time:
+            if session.check_out_time < session.check_in_time:
+                return Response({"success": False, "message": "Checkout time cannot be earlier than Check-in time."}, status=status.HTTP_400_BAD_REQUEST)
+                
         if 'ot_status' in request.data:
             session.ot_status = request.data['ot_status']
         if 'continue_shift' in request.data:
@@ -286,21 +297,29 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             session.auto_checkout = str(val).lower() == 'true' if isinstance(val, str) else bool(val)
             
         if 'check_in_address' in request.data:
-            session.check_in_address = request.data['check_in_address']
+            addr = request.data['check_in_address']
+            session.check_in_address = addr if addr != 'null' else ''
         if 'check_out_address' in request.data:
-            session.check_out_address = request.data['check_out_address']
+            addr = request.data['check_out_address']
+            session.check_out_address = addr if addr != 'null' else ''
             
         if 'captured_image' in request.FILES:
             session.captured_image = request.FILES['captured_image']
         if 'check_out_captured_image' in request.FILES:
             session.check_out_captured_image = request.FILES['check_out_captured_image']
             
-        session.save()
+        try:
+            session.save()
+        except Exception as e:
+            return Response({"success": False, "message": f"Validation failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
         
         # Optionally allow forcing a specific status on the parent attendance
         if 'status' in request.data:
             session.attendance.status = request.data['status']
-            session.attendance.save()
+            try:
+                session.attendance.save()
+            except Exception as e:
+                return Response({"success": False, "message": f"Failed to save attendance status: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
             
         # Also sync parent attendance checkout time if this is the last session
         last_session = session.attendance.sessions.order_by('-check_in_time').first()
@@ -332,13 +351,18 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         
         # Recalculate metrics
         from .services import AttendanceService
-        AttendanceService._recalculate_attendance_metrics(
-            session.attendance,
-            session.attendance.shift or AttendanceService.get_active_shift(employee),
-            session.attendance.date
-        )
+        try:
+            AttendanceService._recalculate_attendance_metrics(
+                session.attendance,
+                session.attendance.shift or AttendanceService.get_active_shift(employee),
+                session.attendance.date
+            )
+        except Exception as e:
+            # Even if recalculation throws a weird error, don't fail the 200 response since save succeeded, but log it
+            import logging
+            logging.error(f"Recalculation error: {str(e)}")
         
-        return Response({"detail": "Session updated successfully."}, status=status.HTTP_200_OK)
+        return Response({"success": True, "message": "Attendance session updated successfully"}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['delete'], url_path='delete-session')
     def delete_session(self, request):

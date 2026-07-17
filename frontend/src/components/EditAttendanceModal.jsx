@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, MenuItem, Box, Alert, CircularProgress,
-  Typography, FormControlLabel, Switch
+  Typography, FormControlLabel, Switch, Avatar
 } from '@mui/material';
-import api from '../services/api';
+import api, { getMediaUrl } from '../services/api';
 
 export default function EditAttendanceModal({ open, onClose, session, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -54,13 +54,15 @@ export default function EditAttendanceModal({ open, onClose, session, onSaved })
       const formData = new FormData();
       formData.append('session_id', session.id);
       formData.append('reason', reason);
-      formData.append('check_in_time', checkInTime);
-      formData.append('check_out_time', checkOutTime);
-      formData.append('status', status);
+      if (checkInTime) formData.append('check_in_time', checkInTime);
+      if (checkOutTime) formData.append('check_out_time', checkOutTime);
+      if (status) formData.append('status', status);
+      
       formData.append('continue_shift', continueShift);
       formData.append('auto_checkout', autoCheckout);
-      formData.append('check_in_address', checkInAddress);
-      formData.append('check_out_address', checkOutAddress);
+      
+      if (checkInAddress) formData.append('check_in_address', checkInAddress);
+      if (checkOutAddress) formData.append('check_out_address', checkOutAddress);
       
       if (otStatus) formData.append('ot_status', otStatus);
       if (capturedImage) formData.append('captured_image', capturedImage);
@@ -177,6 +179,11 @@ export default function EditAttendanceModal({ open, onClose, session, onSaved })
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                 Replace Check-in Photo
               </Typography>
+              {session?.captured_image && (
+                <Box sx={{ mb: 1 }}>
+                  <img src={getMediaUrl(session.captured_image)} alt="Check In" style={{ width: 60, height: 60, borderRadius: 8, objectFit: 'cover' }} />
+                </Box>
+              )}
               <input
                 type="file"
                 accept="image/*"
@@ -187,6 +194,11 @@ export default function EditAttendanceModal({ open, onClose, session, onSaved })
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                 Replace Check-out Photo
               </Typography>
+              {session?.check_out_captured_image && (
+                <Box sx={{ mb: 1 }}>
+                  <img src={getMediaUrl(session.check_out_captured_image)} alt="Check Out" style={{ width: 60, height: 60, borderRadius: 8, objectFit: 'cover' }} />
+                </Box>
+              )}
               <input
                 type="file"
                 accept="image/*"
