@@ -148,10 +148,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         if request.user.role == 'SUPER_ADMIN':
             qs = Attendance.objects.all()
-            employees = User.objects.filter(role='EMPLOYEE')
+            employees = User.objects.filter(role='EMPLOYEE', is_deleted=False, is_active=True)
         else:
             qs = Attendance.objects.filter(employee__company=request.user.company)
-            employees = User.objects.filter(company=request.user.company, role='EMPLOYEE')
+            employees = User.objects.filter(company=request.user.company, role='EMPLOYEE', is_deleted=False, is_active=True)
 
         if request.user.role == 'MANAGER':
             qs = qs.filter(employee__firm=request.user.firm)

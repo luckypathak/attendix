@@ -270,6 +270,23 @@ export default function Employees() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete the ${selectedEmployees.length} selected employees and all their related attendance, leave, and payroll records?`)) {
+      return;
+    }
+    try {
+      await api.post('/employees/bulk-delete/', {
+        employee_ids: selectedEmployees
+      });
+      setSelectedEmployees([]);
+      fetchEmployees();
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Failed to delete selected employees.");
+    }
+  };
+
+
   // Firms directory handlers
   const handleCreateFirm = async (e) => {
     e.preventDefault();
@@ -338,15 +355,26 @@ export default function Employees() {
           severity="info" 
           sx={{ mb: 3, borderRadius: 2, display: 'flex', alignItems: 'center' }}
           action={
-            <Button 
-              variant="contained" 
-              color="primary" 
-              size="small" 
-              startIcon={<ArrowRightLeft size={16} />}
-              onClick={() => setOpenBulkTransferModal(true)}
-            >
-              Transfer Selected ({selectedEmployees.length})
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                size="small" 
+                startIcon={<ArrowRightLeft size={16} />}
+                onClick={() => setOpenBulkTransferModal(true)}
+              >
+                Transfer Selected ({selectedEmployees.length})
+              </Button>
+              <Button 
+                variant="contained" 
+                color="error" 
+                size="small" 
+                startIcon={<Trash2 size={16} />}
+                onClick={handleBulkDelete}
+              >
+                Delete Selected ({selectedEmployees.length})
+              </Button>
+            </Box>
           }
         >
           Workforce Selection: {selectedEmployees.length} members checked.
