@@ -25,9 +25,11 @@ urlpatterns = [
     path('api/v1/audit/', include('attendix.apps.audit.urls')),
 ]
 
+from attendix.apps.attendance.views_media import serve_database_file
+
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
-# Serve media files in both debug and production/Render environments
+# Serve media files from database in both debug and production/Render environments
 urlpatterns += [
-    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    re_path(r'^media/(?P<path>.*)$', serve_database_file, name='serve_media'),
 ]

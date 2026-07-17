@@ -153,3 +153,15 @@ class AttendanceSession(SoftDeleteModel):
     def __str__(self):
         return f"Session of {self.attendance.employee.username} on {self.attendance.date}"
 
+
+class StoredFile(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    content = models.BinaryField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'attendance_stored_file'
+
+    def __str__(self):
+        return self.name
+

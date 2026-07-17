@@ -125,7 +125,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # WhiteNoise storage configuration for Django 5.0+
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": "attendix.apps.attendance.storage.DatabaseStorage",
     },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
