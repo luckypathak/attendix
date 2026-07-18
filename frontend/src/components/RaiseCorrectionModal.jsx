@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Box, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
-import api from '../../api';
+import api from '../services/api';
 
 export default function RaiseCorrectionModal({ open, onClose, onSaved }) {
   const [requestType, setRequestType] = useState('MISSED_OUT');
