@@ -306,7 +306,7 @@ export default function Dashboard() {
                 <Card onClick={() => navigate('/leaves')} sx={{ cursor: 'pointer', border: '1px solid', borderColor: 'divider' }}>
                   <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'rgba(255, 159, 67, 0.1)', color: 'warning.main' }}><Hourglass, ChevronDown, X size={20} /></Box>
+                      <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'rgba(255, 159, 67, 0.1)', color: 'warning.main' }}><Hourglass size={20} /></Box>
                       <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Leaves</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 2, textAlign: 'center' }}>
