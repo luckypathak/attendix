@@ -103,6 +103,28 @@ class AttendanceService:
             # Recalculate parent hours & status
             cls._recalculate_attendance_metrics(session.attendance, active_shift, now.date())
 
+        shift = cls.get_active_shift(employee)
+
+        # Handle Clock In after Shift End
+        if shift:
+            now_dt = timezone.make_aware(datetime.datetime.combine(today, time_now))
+            shift_end_dt = timezone.make_aware(datetime.datetime.combine(today, shift.end_time))
+            if shift.end_time < shift.start_time:
+                shift_end_dt += datetime.timedelta(days=1)
+                
+            # If current time is past shift end and they already have a completed session today
+            if now_dt > shift_end_dt:
+                existing_attendance = Attendance.objects.filter(employee=employee, date=today).first()
+                if existing_attendance and existing_attendance.sessions.filter(check_out_time__isnull=False).exists():
+                    # Check if they have an active session (then it's a different error)
+                    if not existing_attendance.sessions.filter(check_out_time__isnull=True).exists():
+                        from rest_framework.exceptions import APIException
+                        class ShiftEndedOTRequired(APIException):
+                            status_code = 409
+                            default_detail = "Your shift has already ended. Do you want to continue as Overtime?"
+                            default_code = 'requires_ot_approval'
+                        raise ShiftEndedOTRequired()
+
         # Check if user already has an active check-in session today (which is not checked out)
         active_session = AttendanceSession.objects.filter(
             attendance__employee=employee,
@@ -127,7 +149,6 @@ class AttendanceService:
         attendance.check_out_address = None
         attendance.check_out_device_info = None
 
-        shift = cls.get_active_shift(employee)
         if not shift:
             raise ValidationError("No active shift configured for your company. Contact administrator.")
 
@@ -284,9 +305,12 @@ class AttendanceService:
             now_dt = timezone.localtime(timezone.now())
             total_elapsed_seconds = (now_dt - timezone.make_aware(first_in_dt)).total_seconds()
         
-        total_elapsed_seconds = (last_out_dt - first_in_dt).total_seconds()
-        break_seconds = max(0.0, total_elapsed_seconds - total_worked_seconds)
-        attendance.break_hours = round(break_seconds / 3600.0, 2)
+        total_worked_seconds = total_worked_hours * 3600.0
+        if last_session.check_out_time:
+            break_seconds = max(0.0, total_elapsed_seconds - total_worked_seconds)
+            attendance.break_hours = round(break_seconds / 3600.0, 2)
+        else:
+            attendance.break_hours = 0.0
 
         # Half-day rule: If worked hours is less than shift duration (or 6.0 hrs fallback), downgrade status to HALF_DAY
         shift_hours = float(shift.duration_hours) if shift else 9.0
@@ -461,3 +485,58 @@ class AttendanceService:
         cls.check_active_overtimes_and_autocheckout()
 
 
+
+    @classmethod
+    def approve_correction(cls, correction, approved_by):
+        correction.status = 'APPROVED'
+        correction.approved_by = approved_by
+        correction.save()
+        
+        attendance, created = Attendance.objects.get_or_create(
+            employee=correction.employee,
+            date=correction.date,
+            defaults={'status': 'PRESENT'}
+        )
+        
+        # Depending on the correction type, modify sessions
+        from django.utils import timezone
+        import datetime
+        now = timezone.now()
+        
+        # If it's a missed check in, we create a session or update the first session
+        if correction.request_type == 'MISSED_IN' and correction.requested_check_in:
+            session = attendance.sessions.order_by('check_in_time').first()
+            if session:
+                session.check_in_time = correction.requested_check_in
+                session.save()
+            else:
+                AttendanceSession.objects.create(
+                    attendance=attendance,
+                    check_in_time=correction.requested_check_in,
+                    check_out_time=correction.requested_check_out if correction.requested_check_out else None,
+                    check_in_photo=correction.check_in_photo,
+                )
+                
+        # If it's a missed check out, we update the last session
+        elif correction.request_type == 'MISSED_OUT' and correction.requested_check_out:
+            session = attendance.sessions.filter(check_out_time__isnull=True).last()
+            if not session:
+                session = attendance.sessions.order_by('check_in_time').last()
+            if session:
+                session.check_out_time = correction.requested_check_out
+                session.check_out_photo = correction.check_out_photo
+                session.save()
+                
+        # If both
+        elif correction.request_type == 'MISSED_BOTH' and correction.requested_check_in and correction.requested_check_out:
+            AttendanceSession.objects.create(
+                attendance=attendance,
+                check_in_time=correction.requested_check_in,
+                check_out_time=correction.requested_check_out,
+                check_in_photo=correction.check_in_photo,
+                check_out_photo=correction.check_out_photo,
+            )
+            
+        # Recalculate metrics
+        shift = cls.get_active_shift(correction.employee)
+        cls._recalculate_attendance_metrics(attendance, shift, correction.date)

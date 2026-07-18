@@ -11,6 +11,11 @@ import {
 } from '@mui/material';
 import { MapPin, ShieldAlert, CheckCircle, Clock, ChevronDown, ChevronRight, X, Maximize2 } from 'lucide-react';
 import api, { getMediaUrl } from '../services/api';
+import CameraViewer from '../components/CameraViewer';
+import { getError } from '../utils/error';
+import { Trash2, Calendar } from 'lucide-react';
+import RaiseCorrectionModal from '../components/RaiseCorrectionModal';
+import AttendanceCorrections from '../components/AttendanceCorrections';
 import { formatDate } from '../utils/format';
 import EditAttendanceModal from '../components/EditAttendanceModal';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -90,6 +95,8 @@ export default function Attendance() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [overtimeRequests, setOvertimeRequests] = useState([]);
+  const [adminTab, setAdminTab] = useState(0);
   const [expandedDates, setExpandedDates] = useState({});
   const [expandedEmployees, setExpandedEmployees] = useState({});
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
@@ -99,7 +106,8 @@ export default function Attendance() {
   useEffect(() => {
     // Default state: if no date is in URL and no other filters exist, set to today
     if (!searchParams.get('date') && !searchParams.get('employee')) {
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const params = new URLSearchParams(searchParams);
       params.set('date', today);
       setSearchParams(params, { replace: true });
@@ -146,6 +154,9 @@ export default function Attendance() {
   // Camera states
   const [openCameraModal, setOpenCameraModal] = useState(false);
   const [cameraMode, setCameraMode] = useState('IN'); // 'IN' or 'OUT'
+  const [otPromptModal, setOtPromptModal] = useState(false);
+  const [otPromptMessage, setOtPromptMessage] = useState('');
+  const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [stream, setStream] = useState(null);
   const [cameraError, setCameraError] = useState(null);
@@ -502,7 +513,12 @@ export default function Attendance() {
       fetchHistory();
       fetchCurrentState();
     } catch (e) {
-      setGpsError(getError(e, "Failed to check in."));
+      if (e.response && e.response.status === 409 && e.response.data?.requires_ot_approval) {
+        setOtPromptMessage(e.response.data.message);
+        setOtPromptModal(true);
+      } else {
+        setGpsError(getError(e, "Failed to check in."));
+      }
     } finally {
       setGpsLoading(false);
     }
@@ -564,9 +580,19 @@ export default function Attendance() {
   return (
     <Box>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800, mb: 1, letterSpacing: '-0.5px' }}>
-          Attendance Console
-        </Typography>
+        <div className="flex justify-between items-center mb-1">
+          <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: '-0.5px' }}>
+            Attendance Console
+          </Typography>
+          <Button
+            variant="outlined"
+            color="warning"
+            onClick={() => setCorrectionModalOpen(true)}
+            size="small"
+          >
+            Request Correction
+          </Button>
+        </div>
         <Typography variant="body1" color="text.secondary">
           Track clock-ins, verify check-out details, and audit location metrics.
         </Typography>
@@ -753,7 +779,16 @@ export default function Attendance() {
               </Typography>
 
               {isAdmin && (
-                <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Tabs value={adminTab} onChange={(e, v) => setAdminTab(v)} sx={{ mb: 3 }}>
+                  <Tab label="Attendance Records" />
+                  <Tab label={`Overtime Requests (${overtimeRequests.filter(r => r.status === 'PENDING').length})`} />
+                  <Tab label="Correction Requests" />
+                </Tabs>
+              )}
+
+        {isAdmin && adminTab === 0 && (
+          <>
+            <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
                       label="Date"
@@ -798,6 +833,19 @@ export default function Attendance() {
                       <MenuItem value="false">No</MenuItem>
                     </Select>
                   </FormControl>
+                  <Button 
+                    variant="outlined" 
+                    color="secondary" 
+                    size="small"
+                    onClick={() => {
+                      const now = new Date();
+                      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                      setSearchParams({ date: today });
+                      setPage(1);
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
                 </Box>
               )}
 
@@ -1097,6 +1145,12 @@ export default function Attendance() {
           </Grid>
         )}
 
+        {isAdmin && adminTab === 2 && (
+          <Grid item xs={12}>
+            <AttendanceCorrections firmId={selectedFirm} user={user} />
+          </Grid>
+        )}
+
         {/* Overtime Status for Employees */}
         {!isAdmin && (
           <Grid item xs={12}>
@@ -1244,6 +1298,48 @@ export default function Attendance() {
           {viewPhotoUrl && <img src={viewPhotoUrl} alt="Preview" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} />}
         </DialogContent>
       </Dialog>
+
+      {/* OT Prompt Modal */}
+      <Dialog open={otPromptModal} onClose={() => setOtPromptModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Shift Completed</DialogTitle>
+        <DialogContent>
+          <Box sx={{ p: 2 }}>
+            <Typography variant="body1">
+              {otPromptMessage || "Your shift has already ended. Would you like to continue working as Overtime?"}
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setOtPromptModal(false)} color="inherit">
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              try {
+                await api.post('/attendance/overtime/request-ot/', { reason: 'Requested OT after shift end' });
+                setOtPromptModal(false);
+                fetchOvertimeRequests();
+                fetchCurrentState();
+              } catch (e) {
+                alert(getError(e, "Failed to request OT"));
+              }
+            }}
+            variant="contained"
+            color="primary"
+          >
+            Request OT
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      <RaiseCorrectionModal
+        open={correctionModalOpen}
+        onClose={() => setCorrectionModalOpen(false)}
+        onSaved={() => {
+          fetchHistory();
+          fetchCurrentState();
+        }}
+      />
     </Box>
   );
 }

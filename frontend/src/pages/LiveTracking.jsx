@@ -51,7 +51,8 @@ export default function LiveTracking() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const res = await api.get(`/attendance/records/tracking-history/?employee_id=${empId}&date=${today}`);
       setHistory(res.data);
     } catch (err) {

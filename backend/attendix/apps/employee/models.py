@@ -46,6 +46,7 @@ class EmployeeProfile(SoftDeleteModel):
     base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     hourly_rate = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
     checkout_missed_count = models.IntegerField(default=0)
+    missed_checkin_count = models.IntegerField(default=0)
     
     shift = models.ForeignKey(
         'attendance.Shift',

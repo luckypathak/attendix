@@ -2,13 +2,15 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.core.exceptions import ValidationError
+from rest_framework.exceptions import APIException
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.contrib.auth import get_user_model
-from .models import Shift, Attendance, Overtime
+from .models import (
+    Shift, Attendance, AttendanceSession, Overtime, LocationPing, AttendanceCorrectionRequest
+)
 from .serializers import (
-    ShiftSerializer, AttendanceSerializer, OvertimeSerializer,
-    CheckInSerializer, CheckOutSerializer
+    ShiftSerializer, AttendanceSerializer, AttendanceSessionSerializer, OvertimeSerializer, LocationPingSerializer, AttendanceCorrectionSerializer
 )
 from .services import AttendanceService
 
@@ -55,9 +57,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             )
         
         auto_checkout = self.request.query_params.get('autoCheckout')
-        if auto_checkout == 'true':
+        if auto_checkout in ['true', 'YES']:
             base_qs = base_qs.filter(sessions__auto_checkout=True).distinct()
-        elif auto_checkout == 'false':
+        elif auto_checkout in ['false', 'NO']:
             base_qs = base_qs.filter(sessions__auto_checkout=False).distinct()
 
         if user.role == 'SUPER_ADMIN':
@@ -102,6 +104,14 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             if msg.startswith("['") and msg.endswith("']"):
                 msg = msg[2:-2]
             return Response({"detail": msg}, status=status.HTTP_400_BAD_REQUEST)
+        except APIException as e:
+            if getattr(e, 'default_code', '') == 'requires_ot_approval':
+                return Response({
+                    "success": False,
+                    "requires_ot_approval": True,
+                    "message": getattr(e, 'default_detail', str(e))
+                }, status=e.status_code)
+            raise e
 
     @action(detail=False, methods=['get'], url_path='tracking-history')
     def tracking_history(self, request):
@@ -175,11 +185,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def history(self, request):
         # Fetch current month's history for current user
         from django.utils import timezone
+        import datetime
         today = timezone.localtime(timezone.now()).date()
-        start_of_month = today.replace(day=1)
+        start_date = today - datetime.timedelta(days=30)
         records = Attendance.objects.filter(
             employee=request.user,
-            date__gte=start_of_month,
+            date__gte=start_date,
             date__lte=today
         ).order_by('-date')
         return Response(AttendanceSerializer(records, many=True, context={'request': request}).data)
@@ -815,3 +826,96 @@ class OvertimeViewSet(viewsets.ModelViewSet):
                 session.attendance.date
             )
         return Response(OvertimeSerializer(ot).data)
+
+    @action(detail=False, methods=['post'], url_path='request-ot')
+    def request_ot(self, request):
+        employee = request.user
+        from django.utils import timezone
+        import datetime
+        today = timezone.localtime(timezone.now()).date()
+        
+        # Check if already requested today
+        existing_ot = Overtime.objects.filter(employee=employee, date=today, status='PENDING').first()
+        if existing_ot:
+            return Response({"detail": "Overtime request already pending for today."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        attendance = Attendance.objects.filter(employee=employee, date=today).first()
+        if not attendance:
+            return Response({"detail": "No attendance found for today."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create Overtime Request
+        ot = Overtime.objects.create(
+            employee=employee,
+            attendance=attendance,
+            date=today,
+            hours=0.0,
+            status='PENDING'
+        )
+        
+        # Also notify admins
+        from attendix.apps.company.models import Notification
+        Notification.objects.create(
+            recipient=None,
+            firm=employee.firm,
+            company=employee.company,
+            title='OT Request',
+            message=f"{employee.username} has requested overtime.",
+            type='OT_REQUEST'
+        )
+        
+        return Response({"success": True, "message": "OT requested successfully.", "id": ot.id})
+
+
+class AttendanceCorrectionViewSet(viewsets.ModelViewSet):
+    queryset = AttendanceCorrectionRequest.objects.all()
+    serializer_class = AttendanceCorrectionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['employee', 'status', 'request_type', 'date']
+
+    def get_queryset(self):
+        user = self.request.user
+        base_qs = self.queryset.filter(employee__is_deleted=False, employee__is_active=True)
+        if user.role == 'SUPER_ADMIN':
+            return base_qs
+        if user.role == 'MANAGER':
+            return base_qs.filter(employee__company=user.company, employee__firm=user.firm)
+        if user.role == 'COMPANY_ADMIN':
+            return base_qs.filter(employee__company=user.company)
+        return base_qs.filter(employee=user)
+
+    def perform_create(self, serializer):
+        serializer.save(employee=self.request.user)
+
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve(self, request, pk=None):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            return Response({"detail": "Only managers/admins can approve requests."}, status=status.HTTP_403_FORBIDDEN)
+            
+        correction = self.get_object()
+        if correction.status != 'PENDING':
+            return Response({"detail": "Request is not pending."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            from .services import AttendanceService
+            AttendanceService.approve_correction(correction, request.user)
+            return Response({"success": True, "message": "Correction approved and attendance recalculated."})
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject(self, request, pk=None):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            return Response({"detail": "Only managers/admins can reject requests."}, status=status.HTTP_403_FORBIDDEN)
+            
+        correction = self.get_object()
+        if correction.status != 'PENDING':
+            return Response({"detail": "Request is not pending."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        reason = request.data.get('rejected_reason', '')
+        correction.status = 'REJECTED'
+        correction.rejected_reason = reason
+        correction.approved_by = request.user
+        correction.save()
+        
+        return Response({"success": True, "message": "Correction rejected."})

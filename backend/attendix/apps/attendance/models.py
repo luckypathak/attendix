@@ -89,7 +89,7 @@ class Attendance(SoftDeleteModel):
     def computed_worked_hours(self):
         from django.utils import timezone
         import datetime
-        total_seconds = 0
+        intervals = []
         now = timezone.localtime(timezone.now())
         
         # We must recompute from sessions to guarantee no double counting
@@ -103,14 +103,31 @@ class Attendance(SoftDeleteModel):
                 if session.check_out_time < session.check_in_time:
                     checkout_date += datetime.timedelta(days=1)
                 checkout_dt = datetime.datetime.combine(checkout_date, session.check_out_time)
-                diff = (checkout_dt - checkin_dt).total_seconds()
-                if diff >= 60: # Ignore invalid 0 duration sessions
-                    total_seconds += diff
             else:
                 # Active session (running time)
-                diff = (now - timezone.make_aware(checkin_dt)).total_seconds()
-                if diff >= 60:
-                    total_seconds += diff
+                checkout_dt = timezone.make_naive(now) if timezone.is_aware(now) else now
+                
+            intervals.append((checkin_dt, checkout_dt))
+            
+        if not intervals:
+            return 0.00
+            
+        # Merge overlapping intervals
+        intervals.sort(key=lambda x: x[0])
+        merged = [intervals[0]]
+        for current in intervals[1:]:
+            last = merged[-1]
+            if current[0] <= last[1]:
+                merged[-1] = (last[0], max(last[1], current[1]))
+            else:
+                merged.append(current)
+                
+        total_seconds = 0
+        for start, end in merged:
+            diff = (end - start).total_seconds()
+            if diff >= 60: # Ignore invalid 0 duration sessions
+                total_seconds += diff
+                
         return round(total_seconds / 3600.0, 2)
 
 
@@ -277,4 +294,56 @@ class AttendanceAuditLog(models.Model):
 
     def __str__(self):
         return f"Edit by {self.edited_by.username if self.edited_by else 'Unknown'} on session {self.session.id}"
+
+
+class AttendanceCorrectionRequest(SoftDeleteModel):
+    employee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='attendance_corrections'
+    )
+    date = models.DateField()
+    request_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('MISSED_IN', 'Missed Check In'),
+            ('MISSED_OUT', 'Missed Check Out'),
+            ('MISSED_BOTH', 'Missed Both Check In & Check Out')
+        ]
+    )
+    reason = models.TextField()
+    requested_check_in = models.TimeField(null=True, blank=True)
+    requested_check_out = models.TimeField(null=True, blank=True)
+    check_in_photo = models.ImageField(upload_to='correction_photos/', null=True, blank=True)
+    check_out_photo = models.ImageField(upload_to='correction_photos/', null=True, blank=True)
+    location_address = models.TextField(null=True, blank=True)
+    attachment = models.FileField(upload_to='correction_attachments/', null=True, blank=True)
+    
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('PENDING', 'Pending Approval'),
+            ('APPROVED', 'Approved'),
+            ('REJECTED', 'Rejected')
+        ],
+        default='PENDING'
+    )
+    
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_corrections'
+    )
+    rejected_reason = models.TextField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.employee.username} - {self.get_request_type_display()} on {self.date}"
 

@@ -13,11 +13,12 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../services/api';
 
-const getTodayString = () => new Date().toISOString().split('T')[0];
+const getLocalString = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const getTodayString = () => getLocalString(new Date());
 const getYesterdayString = () => {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().split('T')[0];
+  return getLocalString(d);
 };
 
 export default function Dashboard() {
@@ -160,7 +161,7 @@ export default function Dashboard() {
                       <Box onClick={() => {
                         const start = new Date(); start.setDate(1);
                         const end = new Date(); end.setMonth(end.getMonth() + 1, 0);
-                        navigate(`/attendance?startDate=${start.toISOString().split('T')[0]}&endDate=${end.toISOString().split('T')[0]}&autoCheckout=YES`);
+                        navigate(`/attendance?startDate=${getLocalString(start)}&endDate=${getLocalString(end)}&autoCheckout=YES`);
                       }} sx={{ cursor: 'pointer', textAlign: 'right', '&:hover': { opacity: 0.8 } }}>
                         <Typography variant="h5" sx={{ fontWeight: 800 }}>{stats?.attendance?.auto_checkouts_month ?? 0}</Typography>
                         <Typography variant="caption" color="text.secondary">This Month</Typography>
@@ -483,7 +484,7 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {stats?.attendance?.history?.filter(h => h.date === new Date().toISOString().split('T')[0]).map((row, idx) => (
+                    {stats?.attendance?.history?.filter(h => h.date === getTodayString()).map((row, idx) => (
                       <TableRow key={idx} hover>
                         <TableCell>{row.employee}</TableCell>
                         <TableCell>
@@ -495,7 +496,7 @@ export default function Dashboard() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {(!stats?.attendance?.history || stats?.attendance?.history?.filter(h => h.date === new Date().toISOString().split('T')[0]).length === 0) && (
+                    {(!stats?.attendance?.history || stats?.attendance?.history?.filter(h => h.date === getTodayString()).length === 0) && (
                       <TableRow>
                         <TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>No auto checkouts today</TableCell>
                       </TableRow>
@@ -525,7 +526,7 @@ export default function Dashboard() {
                     {stats?.attendance?.history?.filter(h => {
                       const d = new Date();
                       d.setDate(d.getDate() - 1);
-                      return h.date === d.toISOString().split('T')[0];
+                      return h.date === getLocalString(d);
                     }).map((row, idx) => (
                       <TableRow key={idx} hover>
                         <TableCell>{row.employee}</TableCell>
@@ -541,7 +542,7 @@ export default function Dashboard() {
                     {(!stats?.attendance?.history || stats?.attendance?.history?.filter(h => {
                       const d = new Date();
                       d.setDate(d.getDate() - 1);
-                      return h.date === d.toISOString().split('T')[0];
+                      return h.date === getLocalString(d);
                     }).length === 0) && (
                       <TableRow>
                         <TableCell colSpan={4} align="center" sx={{ py: 3, color: 'text.secondary' }}>No auto checkouts yesterday</TableCell>

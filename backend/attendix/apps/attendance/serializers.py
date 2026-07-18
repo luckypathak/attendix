@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import Shift, Attendance, Overtime, AttendanceSession
+from .models import (
+    Shift, Attendance, AttendanceSession, Overtime, LocationPing, AttendanceAuditLog, AttendanceCorrectionRequest
+)
 
 
 class ShiftSerializer(serializers.ModelSerializer):
@@ -128,3 +130,29 @@ class CheckOutSerializer(serializers.Serializer):
     device_info = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     captured_image = serializers.ImageField(required=True)
 
+
+class AttendanceCorrectionSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.get_full_name', read_only=True)
+    employee_username = serializers.CharField(source='employee.username', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.username', read_only=True)
+    request_type_display = serializers.CharField(source='get_request_type_display', read_only=True)
+
+    class Meta:
+        model = AttendanceCorrectionRequest
+        fields = '__all__'
+        read_only_fields = ['status', 'approved_by', 'rejected_reason', 'employee']
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if not request or not hasattr(request, 'user'):
+            return attrs
+            
+        employee = request.user
+        date = attrs.get('date')
+        req_type = attrs.get('request_type')
+        
+        # Prevent duplicates
+        if AttendanceCorrectionRequest.objects.filter(employee=employee, date=date, request_type=req_type, status='PENDING').exists():
+            raise serializers.ValidationError("You already have a pending correction request for this date and type.")
+            
+        return attrs
