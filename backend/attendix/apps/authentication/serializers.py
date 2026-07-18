@@ -13,11 +13,27 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['username'] = user.username
         token['email'] = user.email
         token['role'] = user.role
-        token['company_id'] = user.company_id if user.company else None
+        token['company_id'] = user.company_id
         return token
 
     def validate(self, attrs):
         data = super().validate(attrs)
+        
+        # Safely get employee profile data
+        try:
+            profile = self.user.employee_profile
+            allowed_leaves = profile.allowed_leaves
+            used_leaves = profile.used_leaves
+        except Exception:
+            allowed_leaves = 12
+            used_leaves = 0
+            
+        # Safely get firm name
+        try:
+            firm_name = self.user.firm.name if self.user.firm_id else None
+        except Exception:
+            firm_name = None
+
         data['user'] = {
             'id': self.user.id,
             'username': self.user.username,
@@ -25,11 +41,11 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             'first_name': self.user.first_name,
             'last_name': self.user.last_name,
             'role': self.user.role,
-            'company_id': self.user.company_id if self.user.company else None,
-            'firm_id': self.user.firm_id if self.user.firm else None,
-            'firm_name': self.user.firm.name if self.user.firm else None,
-            'allowed_leaves': self.user.employee_profile.allowed_leaves if hasattr(self.user, 'employee_profile') else 12,
-            'used_leaves': self.user.employee_profile.used_leaves if hasattr(self.user, 'employee_profile') else 0
+            'company_id': self.user.company_id,
+            'firm_id': self.user.firm_id,
+            'firm_name': firm_name,
+            'allowed_leaves': allowed_leaves,
+            'used_leaves': used_leaves
         }
         return data
 
