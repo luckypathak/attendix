@@ -7,7 +7,7 @@ import {
   TableContainer, TableHead, TableRow, Paper, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Accordion, AccordionSummary, AccordionDetails, Tooltip,
-  IconButton, Pagination, Select, MenuItem, InputLabel, FormControl
+  IconButton, Pagination, Select, MenuItem, InputLabel, FormControl, Tabs, Tab
 } from '@mui/material';
 import { MapPin, ShieldAlert, CheckCircle, Clock, ChevronDown, ChevronRight, X, Maximize2 } from 'lucide-react';
 import api, { getMediaUrl } from '../services/api';
