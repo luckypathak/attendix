@@ -17,6 +17,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
+import useBackgroundLocation from '../hooks/useBackgroundLocation';
 
 
 // --- STYLED COMPONENTS & HELPERS ---
@@ -109,6 +110,10 @@ export default function Attendance() {
   // Edit Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedSessionForEdit, setSelectedSessionForEdit] = useState(null);
+  
+  const [companySettings, setCompanySettings] = useState(null);
+  
+  useBackgroundLocation(isClockedIn, user?.work_category, companySettings);
 
   const handleDeleteSession = async (sessionId) => {
     if (!window.confirm("Are you sure you want to delete this session?")) return;
@@ -122,6 +127,20 @@ export default function Attendance() {
   };
 
   useEffect(() => {
+    const fetchCompanySettings = async () => {
+      try {
+        const res = await api.get('/company/companies/');
+        let company = null;
+        if (Array.isArray(res.data.results) && res.data.results.length > 0) {
+          company = res.data.results.find(c => c.name === user?.firm_name) || res.data.results[0];
+        } else if (Array.isArray(res.data) && res.data.length > 0) {
+          company = res.data.find(c => c.name === user?.firm_name) || res.data[0];
+        }
+        setCompanySettings(company);
+      } catch (err) {}
+    };
+    fetchCompanySettings();
+    
     fetchHistory();
     fetchOvertimeRequests();
     if (isAdmin) fetchAdminRecords();
@@ -649,7 +668,13 @@ export default function Attendance() {
                         setFilters(prev => ({ ...prev, date: newValue ? newValue.format('YYYY-MM-DD') : '' }));
                         setPage(1);
                       }}
-                      slotProps={{ textField: { size: 'small' } }}
+                      slotProps={{ 
+                        textField: { 
+                          size: 'medium', 
+                          variant: 'outlined',
+                          sx: { width: '200px', '& .MuiInputBase-root': { py: 0.5 } }
+                        } 
+                      }}
                     />
                   </LocalizationProvider>
                   <TextField 

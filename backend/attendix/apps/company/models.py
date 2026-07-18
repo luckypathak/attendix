@@ -31,6 +31,11 @@ class Company(SoftDeleteModel):
     late_limit_for_half_day = models.IntegerField(default=3)
     auto_checkout_hours = models.DecimalField(max_digits=4, decimal_places=2, default=10.00) # Auto checkout if forgot
     
+    # Location tracking settings
+    office_radius_meters = models.IntegerField(default=100)
+    location_update_frequency_minutes = models.IntegerField(default=5)
+    geofence_grace_period_minutes = models.IntegerField(default=5)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

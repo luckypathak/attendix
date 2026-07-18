@@ -4,6 +4,17 @@ from attendix.apps.company.models import Department, Designation, SoftDeleteMode
 
 
 class EmployeeProfile(SoftDeleteModel):
+    WORK_CATEGORY_CHOICES = [
+        ('OFFICE', 'Office Staff'),
+        ('FIELD', 'Field Staff')
+    ]
+    
+    work_category = models.CharField(
+        max_length=20,
+        choices=WORK_CATEGORY_CHOICES,
+        default='OFFICE'
+    )
+    
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

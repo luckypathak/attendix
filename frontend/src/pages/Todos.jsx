@@ -255,9 +255,10 @@ export default function Todos() {
                     <Box sx={{ mb: 3 }}>
                       <DatePicker
                         label="Due Date"
+                        format="DD/MM/YYYY"
                         value={dueDate}
                         onChange={(newValue) => setDueDate(newValue)}
-                        slotProps={{ textField: { fullWidth: true } }}
+                        slotProps={{ textField: { fullWidth: true, size: 'medium', variant: 'outlined' } }}
                       />
                     </Box>
 
@@ -496,9 +497,10 @@ export default function Todos() {
               <Box sx={{ mb: 3 }}>
                 <DatePicker
                   label="Due Date"
+                  format="DD/MM/YYYY"
                   value={editDueDate}
                   onChange={(newValue) => setEditDueDate(newValue)}
-                  slotProps={{ textField: { fullWidth: true } }}
+                  slotProps={{ textField: { fullWidth: true, size: 'medium', variant: 'outlined' } }}
                 />
               </Box>
 

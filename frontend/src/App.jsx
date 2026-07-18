@@ -17,6 +17,8 @@ import Reimbursements from './pages/Reimbursements';
 import Todos from './pages/Todos';
 import SMSGateway from './pages/SMSGateway';
 import AuditLogs from './pages/AuditLogs';
+import CompanySettings from './pages/CompanySettings';
+import LiveTracking from './pages/LiveTracking';
 
 // Higher order component for route shielding
 function PrivateRoute({ children }) {
@@ -48,6 +50,7 @@ export default function App() {
           <Route path="employees" element={<Employees />} />
           <Route path="attendance" element={<Attendance />} />
           <Route path="attendance-analytics" element={<AttendanceAnalytics />} />
+
           <Route path="leaves" element={<Leaves />} />
           <Route path="payroll" element={<Payroll />} />
           <Route path="reimbursements" element={<Reimbursements />} />
@@ -55,6 +58,8 @@ export default function App() {
           <Route path="sms" element={<SMSGateway />} />
           <Route path="audit" element={<AuditLogs />} />
           <Route path="companies" element={<Companies />} />
+          <Route path="settings" element={<CompanySettings />} />
+          <Route path="live-tracking" element={<LiveTracking />} />
         </Route>
 
 

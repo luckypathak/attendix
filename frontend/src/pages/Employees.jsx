@@ -37,6 +37,7 @@ export default function Employees() {
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('EMPLOYEE');
+  const [workCategory, setWorkCategory] = useState('OFFICE');
   const [baseSalary, setBaseSalary] = useState('45000');
   const [joiningDate, setJoiningDate] = useState(new Date().toISOString().split('T')[0]);
   
@@ -140,6 +141,7 @@ export default function Employees() {
     setLastName(emp.last_name || '');
     setPassword('');
     setRole(emp.role);
+    setWorkCategory(emp.work_category || 'OFFICE');
     setBaseSalary(emp.base_salary);
     setJoiningDate(emp.joining_date);
     setFirmId(emp.firm_id || '');
@@ -211,6 +213,7 @@ export default function Employees() {
       first_name: firstName,
       last_name: lastName,
       role,
+      work_category: workCategory,
       base_salary: parseFloat(baseSalary),
       joining_date: joiningDate,
       shift_id: (shiftId && shiftId !== 'CUSTOM') ? parseInt(shiftId) : null,
@@ -416,6 +419,7 @@ export default function Employees() {
                   <TableCell sx={{ fontWeight: 700 }}>Shift timing</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>PF Deduction</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Work Category</TableCell>
                   {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Missed Checkouts</TableCell>}
                   {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Base Salary (₹)</TableCell>}
                   {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Hourly Rate (₹)</TableCell>}
@@ -463,7 +467,7 @@ export default function Employees() {
                               label={alloc.firm_name || 'No Branch'} 
                               size="small"
                               variant="outlined" 
-                              color="secondary"
+                              color="primary"
                               sx={{ 
                                 fontWeight: 600, 
                                 fontSize: '0.7rem',
@@ -508,6 +512,14 @@ export default function Employees() {
                           sx={{ fontWeight: 700, fontSize: '0.65rem' }}
                         />
                       </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={emp.work_category === 'FIELD' ? 'FIELD STAFF' : 'OFFICE STAFF'} 
+                          size="small" 
+                          color={emp.work_category === 'FIELD' ? 'warning' : 'primary'} 
+                          sx={{ fontWeight: 700, fontSize: '0.65rem' }}
+                        />
+                      </TableCell>
                       {isAdmin && (
                         <TableCell>
                           <Chip 
@@ -523,7 +535,7 @@ export default function Employees() {
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                             <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{parseFloat(emp.base_salary || 0).toLocaleString('en-IN')}</Typography>
                             {emp.firm_allocations && emp.firm_allocations.map(alloc => (
-                              <Typography key={alloc.id} variant="body2" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>₹{parseFloat(alloc.base_salary || 0).toLocaleString('en-IN')}</Typography>
+                              <Typography key={alloc.id} variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{parseFloat(alloc.base_salary || 0).toLocaleString('en-IN')}</Typography>
                             ))}
                           </Box>
                         </TableCell>
@@ -535,7 +547,7 @@ export default function Employees() {
                             {emp.firm_allocations && emp.firm_allocations.map(alloc => {
                                // Approximate hourly rate for allocations just to show visually if needed
                                const hourly = parseFloat(alloc.base_salary || 0) / 30 / 8;
-                               return <Typography key={alloc.id} variant="body2" color="text.secondary" sx={{ fontSize: '0.7rem' }}>₹{hourly.toFixed(2)}/hr</Typography>;
+                               return <Typography key={alloc.id} variant="body2" sx={{ fontSize: '0.8rem' }}>₹{hourly.toFixed(2)}/hr</Typography>;
                             })}
                           </Box>
                         </TableCell>
@@ -661,6 +673,20 @@ export default function Employees() {
                 </Grid>
               )}
 
+              <Grid item xs={12} sm={isManager ? 12 : 6}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Work Category"
+                  value={workCategory}
+                  onChange={(e) => setWorkCategory(e.target.value)}
+                  required
+                >
+                  <MenuItem value="OFFICE">Office Staff</MenuItem>
+                  <MenuItem value="FIELD">Field Staff</MenuItem>
+                </TextField>
+              </Grid>
+
               {!isManager && (
                 <Grid item xs={12} sm={6}>
                   <TextField
@@ -739,9 +765,17 @@ export default function Employees() {
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DatePicker
                     label="Joining Date"
+                    format="DD/MM/YYYY"
                     value={joiningDate ? dayjs(joiningDate) : null}
                     onChange={(newValue) => setJoiningDate(newValue ? newValue.format('YYYY-MM-DD') : '')}
-                    slotProps={{ textField: { fullWidth: true } }}
+                    slotProps={{ 
+                      textField: { 
+                        fullWidth: true,
+                        size: 'medium',
+                        variant: 'outlined',
+                        sx: { '& .MuiInputBase-root': { py: 0.5 } }
+                      } 
+                    }}
                   />
                 </LocalizationProvider>
               </Grid>
@@ -857,7 +891,7 @@ export default function Employees() {
                 })}
 
                 {(() => {
-                  const unassignedFirms = firms.filter(f => !allocations.some(a => a.firm === f.id) && f.id !== firmId);
+                  const unassignedFirms = firms.filter(f => !allocations.some(a => String(a.firm) === String(f.id)) && String(f.id) !== String(firmId));
                   if (unassignedFirms.length === 0) {
                     return (
                       <Typography variant="body2" color="success.main" sx={{ mt: 2, fontWeight: 600 }}>

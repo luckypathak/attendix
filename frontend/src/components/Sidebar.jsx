@@ -8,7 +8,7 @@ import {
 import { 
   LayoutDashboard, CalendarRange, FileSpreadsheet, 
   WalletCards, CheckSquare, MessageSquareShare, FileClock, Shield,
-  Users, Landmark, BarChart2
+  Users, Landmark, BarChart2, MapPin, Settings
 } from 'lucide-react';
 
 const drawerWidth = 240;
@@ -28,7 +28,9 @@ export default function Sidebar({ open, mobileOpen, handleDrawerToggle }) {
     { text: 'Tasks', path: '/todos', icon: <CheckSquare size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'EMPLOYEE'] },
     { text: 'SMS Gateway', path: '/sms', icon: <MessageSquareShare size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
     { text: 'Audit Logs', path: '/audit', icon: <FileClock size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
+    { text: 'Live Tracking', path: '/live-tracking', icon: <MapPin size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
     { text: 'Companies', path: '/companies', icon: <Landmark size={20} />, roles: ['SUPER_ADMIN'] },
+    { text: 'Settings', path: '/settings', icon: <Settings size={20} />, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN'] },
   ];
 
 

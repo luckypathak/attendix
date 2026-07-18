@@ -121,28 +121,33 @@ class AttendanceService:
             attendance.check_in_accuracy = accuracy
             attendance.check_in_address = address
             attendance.check_in_device_info = device_info
-            attendance.captured_image = captured_image
+            from django.core.files.base import ContentFile
+            if captured_image:
+                img_content = captured_image.read()
+                attendance.captured_image.save(captured_image.name, ContentFile(img_content), save=False)
+                captured_image.seek(0)
+            
             attendance.status = status
             attendance.save()
-            if captured_image:
-                try:
-                    captured_image.seek(0)
-                except Exception:
-                    pass
         else:
             attendance.save()
 
         # Create new session record
-        AttendanceSession.objects.create(
+        session = AttendanceSession(
             attendance=attendance,
             check_in_time=time_now,
-            captured_image=captured_image,
             check_in_lat=lat,
             check_in_lng=lng,
             check_in_accuracy=accuracy,
             check_in_address=address,
             check_in_device_info=device_info
         )
+        if captured_image:
+            captured_image.seek(0)
+            img_content = captured_image.read()
+            session.captured_image.save(captured_image.name, ContentFile(img_content), save=False)
+            captured_image.seek(0)
+        session.save()
 
         return attendance
 

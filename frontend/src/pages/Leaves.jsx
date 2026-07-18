@@ -329,18 +329,20 @@ export default function Leaves() {
                     <Box sx={{ mb: 2.5 }}>
                       <DatePicker
                         label="Start Date"
+                        format="DD/MM/YYYY"
                         value={startDate}
                         onChange={(newValue) => setStartDate(newValue)}
-                        slotProps={{ textField: { fullWidth: true } }}
+                        slotProps={{ textField: { fullWidth: true, size: 'medium', variant: 'outlined' } }}
                       />
                     </Box>
 
                     <Box sx={{ mb: 2.5 }}>
                       <DatePicker
                         label="End Date"
+                        format="DD/MM/YYYY"
                         value={endDate}
                         onChange={(newValue) => setEndDate(newValue)}
-                        slotProps={{ textField: { fullWidth: true } }}
+                        slotProps={{ textField: { fullWidth: true, size: 'medium', variant: 'outlined' } }}
                       />
                     </Box>
 

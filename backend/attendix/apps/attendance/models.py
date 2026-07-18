@@ -182,11 +182,34 @@ class AttendanceSession(SoftDeleteModel):
     check_out_address = models.TextField(null=True, blank=True)
     check_out_device_info = models.CharField(max_length=255, null=True, blank=True)
 
+    # Smart location tracking for Office Staff
+    out_of_office_since = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Session of {self.attendance.employee.username} on {self.attendance.date}"
+
+
+class LocationPing(models.Model):
+    session = models.ForeignKey(
+        AttendanceSession,
+        on_delete=models.CASCADE,
+        related_name='location_pings'
+    )
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    accuracy = models.FloatField(null=True, blank=True)
+    speed = models.FloatField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_stop = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['timestamp']
+
+    def __str__(self):
+        return f"Ping for Session {self.session.id} at {self.timestamp}"
 
 
 class StoredFile(models.Model):
