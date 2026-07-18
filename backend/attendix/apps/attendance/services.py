@@ -597,7 +597,7 @@ class AttendanceService:
                     attendance=attendance,
                     check_in_time=correction.requested_check_in,
                     check_out_time=correction.requested_check_out if correction.requested_check_out else None,
-                    check_in_photo=correction.check_in_photo,
+                    captured_image=correction.check_in_photo,
                 )
                 
         # If it's a missed check out, we update the last session
@@ -607,7 +607,7 @@ class AttendanceService:
                 session = attendance.sessions.order_by('check_in_time').last()
             if session:
                 session.check_out_time = correction.requested_check_out
-                session.check_out_photo = correction.check_out_photo
+                session.check_out_captured_image = correction.check_out_photo
                 session.save()
                 
         # If both
@@ -616,8 +616,8 @@ class AttendanceService:
                 attendance=attendance,
                 check_in_time=correction.requested_check_in,
                 check_out_time=correction.requested_check_out,
-                check_in_photo=correction.check_in_photo,
-                check_out_photo=correction.check_out_photo,
+                captured_image=correction.check_in_photo,
+                check_out_captured_image=correction.check_out_photo,
             )
             
         elif correction.request_type == 'CONTINUE_SHIFT':
