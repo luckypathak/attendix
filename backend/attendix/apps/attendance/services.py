@@ -437,8 +437,9 @@ class AttendanceService:
         tz = timezone.get_current_timezone()
         now_dt = timezone.localtime(timezone.now())
 
-        # Find all active sessions (where check_out_time is null)
-        active_sessions = AttendanceSession.objects.filter(check_out_time__isnull=True)
+        # Find all active sessions for today (older ones handled by reconciliation task)
+        today = now_dt.date()
+        active_sessions = AttendanceSession.objects.filter(check_out_time__isnull=True, attendance__date=today)
 
         for session in active_sessions:
             attendance = session.attendance
