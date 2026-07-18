@@ -595,19 +595,21 @@ export default function Attendance() {
   return (
     <Box>
       <Box sx={{ mb: 4 }}>
-        <div className="flex justify-between items-center mb-1">
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: '-0.5px' }}>
             Attendance Console
           </Typography>
-          <Button
-            variant="outlined"
-            color="warning"
-            onClick={() => setCorrectionModalOpen(true)}
-            size="small"
-          >
-            Request Correction
-          </Button>
-        </div>
+          {!isAdmin && (
+            <Button
+              variant="outlined"
+              color="warning"
+              onClick={() => setCorrectionModalOpen(true)}
+              size="small"
+            >
+              Request Correction
+            </Button>
+          )}
+        </Box>
         <Typography variant="body1" color="text.secondary">
           Track clock-ins, verify check-out details, and audit location metrics.
         </Typography>
