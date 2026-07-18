@@ -57,7 +57,7 @@ export default function LiveTracking() {
     } catch (err) {
       console.error(err);
       if (err.response && err.response.status === 404) {
-        setErrorMsg("No active tracking history found for today.");
+        setErrorMsg(`Employee has not checked in today. No tracking history available.`);
         setHistory(null);
       } else {
         setErrorMsg("Failed to load tracking data.");
