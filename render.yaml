@@ -55,7 +55,7 @@ services:
     rootDir: "frontend"
     envVars:
       - key: VITE_API_URL
-        value: https://attendix-backend.onrender.com/api/v1
+        value: https://attendix-xeoa.onrender.com/api/v1
     routes:
       - type: rewrite
         source: "/*"
