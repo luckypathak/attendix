@@ -4,6 +4,10 @@ from .models import EmployeeProfile
 from .serializers import EmployeeDetailsSerializer
 
 
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
+
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = EmployeeProfile.objects.filter(user__is_deleted=False, user__is_active=True)
     serializer_class = EmployeeDetailsSerializer
@@ -36,15 +40,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 pass
         return base_qs
 
-
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
-
-    from rest_framework.decorators import action
-    from rest_framework.response import Response
-    from rest_framework import status
 
     @action(detail=False, methods=['post'], url_path='bulk-transfer')
     def bulk_transfer(self, request):
