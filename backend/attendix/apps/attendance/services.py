@@ -437,9 +437,8 @@ class AttendanceService:
         tz = timezone.get_current_timezone()
         now_dt = timezone.localtime(timezone.now())
 
-        # Find all active sessions for today (older ones handled by reconciliation task)
-        today = now_dt.date()
-        active_sessions = AttendanceSession.objects.filter(check_out_time__isnull=True, attendance__date=today)
+        # Find all active sessions (even older ones, so we can catch up if server was down)
+        active_sessions = AttendanceSession.objects.filter(check_out_time__isnull=True)
 
         for session in active_sessions:
             attendance = session.attendance
@@ -508,8 +507,12 @@ class AttendanceService:
                         pending_request.status = 'REJECTED'
                         pending_request.rejected_reason = 'AUTO REJECTED (Timeout)'
                         pending_request.save()
+                        
+                        # Use exact timeout boundary (shift end + 30 mins) if we are very late (server down)
+                        ideal_checkout = shift_end_dt + datetime.timedelta(minutes=30)
+                        final_checkout_dt = ideal_checkout if mins_since_shift_end > 45 else now_dt
 
-                        cls._perform_auto_checkout(session, employee, attendance, now_dt, shift)
+                        cls._perform_auto_checkout(session, employee, attendance, final_checkout_dt, shift)
 
     @classmethod
     def _perform_auto_checkout(cls, session, employee, attendance, checkout_dt, shift):
