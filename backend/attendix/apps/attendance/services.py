@@ -9,6 +9,53 @@ User = get_user_model()
 
 
 class AttendanceService:
+    @classmethod
+    def mark_absentees_for_date(cls, company, date):
+        from django.contrib.auth import get_user_model
+        from attendix.apps.leave.models import LeaveRequest
+        from .models import Attendance
+        import datetime
+        from django.utils import timezone
+        
+        User = get_user_model()
+        employees = User.objects.filter(company=company, role='EMPLOYEE', is_active=True, is_deleted=False)
+        today = timezone.localdate()
+        
+        if date > today:
+            return # Future dates cannot be marked absent
+            
+        now = timezone.localtime(timezone.now()).time()
+        
+        for emp in employees:
+            if Attendance.objects.filter(employee=emp, date=date).exists():
+                continue
+                
+            if LeaveRequest.objects.filter(employee=emp, start_date__lte=date, end_date__gte=date, status='APPROVED').exists():
+                continue
+                
+            shift = cls.get_active_shift(emp)
+            if not shift or not shift.start_time:
+                continue
+                
+            grace = company.grace_period_minutes or 0
+            is_absent = False
+            
+            if date < today:
+                is_absent = True
+            else:
+                dummy = datetime.datetime.combine(date, shift.start_time)
+                cutoff = (dummy + datetime.timedelta(minutes=grace)).time()
+                if now > cutoff:
+                    is_absent = True
+                    
+            if is_absent:
+                Attendance.objects.create(
+                    employee=emp,
+                    date=date,
+                    shift=shift,
+                    status=Attendance.Statuses.ABSENT
+                )
+
     @staticmethod
     def get_active_shift(employee):
         # Retrieve employee's shift. If not configured, fall back to first shift of company or default

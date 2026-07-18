@@ -103,6 +103,10 @@ class DashboardStatsView(APIView):
             from attendix.apps.payroll.models import AdvanceSalary, Payroll
             from attendix.apps.employee.models import EmployeeProfile
 
+            # Execute Absent Engine to mark employees who haven't checked in as ABSENT
+            from attendix.apps.attendance.services import AttendanceService
+            AttendanceService.mark_absentees_for_date(user.company, today)
+
             # 1. Attendance Stats
             total_employees = EmployeeProfile.objects.filter(**emp_q).count()
             att_q = dict(base_q, date=today)
@@ -129,10 +133,10 @@ class DashboardStatsView(APIView):
                 attendance__date__gte=this_month_start, auto_checkout=True, **{f'attendance__{k}': v for k, v in base_q.items()}
             ).values('attendance__employee__username').annotate(count=Count('id')).order_by('-count')[:5])
 
-            # 2. Leaves
-            pending_leaves = LeaveRequest.objects.filter(status='PENDING', **base_q).count()
-            approved_leaves = LeaveRequest.objects.filter(status='APPROVED', **base_q).count()
-            rejected_leaves = LeaveRequest.objects.filter(status='REJECTED', **base_q).count()
+            # 2. Leaves (For Today Only)
+            pending_leaves = LeaveRequest.objects.filter(status='PENDING', start_date__lte=today, end_date__gte=today, **base_q).count()
+            approved_leaves = LeaveRequest.objects.filter(status='APPROVED', start_date__lte=today, end_date__gte=today, **base_q).count()
+            rejected_leaves = LeaveRequest.objects.filter(status='REJECTED', start_date__lte=today, end_date__gte=today, **base_q).count()
 
             # 3. Overtime
             pending_ot = Overtime.objects.filter(status='PENDING', **base_q).count()

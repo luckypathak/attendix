@@ -522,7 +522,7 @@ export default function Attendance() {
                           <Chip label="Auto Checked Out" color="error" size="small" sx={{ mt: 1, fontWeight: 700 }} />
                         )}
                         <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600, color: 'primary.main' }}>
-                          Today's Total: {attendanceToday.total_worked_hours || '0.00'} Hours
+                          Today's Total: {attendanceToday.formatted_worked_hours || '0h 0m'}
                         </Typography>
                       </Box>
                     );
@@ -753,7 +753,7 @@ export default function Attendance() {
                                     <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', width: '100%' }}>
                                       <Typography sx={{ fontWeight: 600, minWidth: 150 }}>{empRec.employee_name}</Typography>
                                       <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
-                                      <Typography variant="body2" color="text.secondary">Total: {empRec.total_worked_hours || '0.00'} Hrs</Typography>
+                                      <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
                                       <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ ml: 'auto', fontSize: '0.7rem' }}>
                                         Pre-Approve OT
                                       </Button>
@@ -861,7 +861,7 @@ export default function Attendance() {
                                     {formatDate(rec.date)}
                                   </Typography>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                    <Typography variant="body2"><strong>Daily Total:</strong> {rec.total_worked_hours || '0.00'} Hours</Typography>
+                                    <Typography variant="body2"><strong>Daily Total:</strong> {rec.formatted_worked_hours || '0h 0m'}</Typography>
                                     <Chip label={rec.status} size="small" color={getStatusChipColor(rec.status)} sx={{ fontWeight: 600, fontSize: '0.75rem' }} />
                                   </Box>
                                 </Box>

@@ -27,9 +27,9 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
             if instance.check_out_time < instance.check_in_time:
                 dt_out += datetime.timedelta(days=1)
             diff_secs = (dt_out - dt_in).total_seconds()
-            hrs = round(diff_secs / 3600.0, 2)
-            hrs_str = f"{int(hrs)} Hours" if hrs.is_integer() else f"{hrs} Hours"
-            ret['working_hours'] = hrs_str
+            hrs = int(diff_secs // 3600)
+            mins = int((diff_secs % 3600) // 60)
+            ret['working_hours'] = f"{hrs}h {mins}m"
         else:
             ret['working_hours'] = '--'
         return ret
@@ -52,6 +52,18 @@ class AttendanceSerializer(serializers.ModelSerializer):
             ret['check_in_time'] = instance.check_in_time.strftime('%I:%M %p')
         if instance.check_out_time:
             ret['check_out_time'] = instance.check_out_time.strftime('%I:%M %p')
+        # Format total worked hours
+        if instance.total_worked_hours:
+            dec_hrs = float(instance.total_worked_hours)
+            hrs = int(dec_hrs)
+            mins = int(round((dec_hrs - hrs) * 60))
+            if mins == 60:
+                hrs += 1
+                mins = 0
+            ret['formatted_worked_hours'] = f"{hrs}h {mins}m"
+        else:
+            ret['formatted_worked_hours'] = '0h 0m'
+
         # Add a flag to indicate if we are in the shift end window
         from django.utils import timezone
         import datetime
