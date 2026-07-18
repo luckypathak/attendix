@@ -85,6 +85,34 @@ class Attendance(SoftDeleteModel):
     def __str__(self):
         return f"{self.employee.username} - {self.date} - {self.status}"
 
+    @property
+    def computed_worked_hours(self):
+        from django.utils import timezone
+        import datetime
+        total_seconds = 0
+        now = timezone.localtime(timezone.now())
+        
+        # We must recompute from sessions to guarantee no double counting
+        for session in self.sessions.all():
+            if not session.check_in_time:
+                continue
+            checkin_dt = datetime.datetime.combine(self.date, session.check_in_time)
+            
+            if session.check_out_time:
+                checkout_date = self.date
+                if session.check_out_time < session.check_in_time:
+                    checkout_date += datetime.timedelta(days=1)
+                checkout_dt = datetime.datetime.combine(checkout_date, session.check_out_time)
+                diff = (checkout_dt - checkin_dt).total_seconds()
+                if diff >= 60: # Ignore invalid 0 duration sessions
+                    total_seconds += diff
+            else:
+                # Active session (running time)
+                diff = (now - timezone.make_aware(checkin_dt)).total_seconds()
+                if diff >= 60:
+                    total_seconds += diff
+        return round(total_seconds / 3600.0, 2)
+
 
 class Overtime(SoftDeleteModel):
     employee = models.ForeignKey(

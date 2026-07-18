@@ -611,10 +611,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         end_date_str = request.query_params.get('end_date')
 
         if request.user.role == 'SUPER_ADMIN':
-            qs = Attendance.objects.all()
+            qs = Attendance.objects.all().prefetch_related('sessions')
             employees = User.objects.filter(role='EMPLOYEE', is_deleted=False, is_active=True)
         else:
-            qs = Attendance.objects.filter(employee__company=request.user.company)
+            qs = Attendance.objects.filter(employee__company=request.user.company).prefetch_related('sessions')
             employees = User.objects.filter(company=request.user.company, role='EMPLOYEE', is_deleted=False, is_active=True)
 
         if request.user.role == 'MANAGER':
@@ -675,13 +675,17 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             leave_days = emp_qs.filter(status=Attendance.Statuses.LEAVE).count()
 
             from django.db.models import Sum
-            total_working_hours = float(emp_qs.aggregate(total=Sum('total_worked_hours'))['total'] or 0.0)
+            total_working_hours = 0.0
             total_break_hours = float(emp_qs.aggregate(total=Sum('break_hours'))['total'] or 0.0)
             total_overtime_hours = float(emp_qs.aggregate(total=Sum('overtime_hours'))['total'] or 0.0)
 
             records = []
             for record in emp_qs.order_by('-date'):
+                computed_hrs = float(record.computed_worked_hours)
+                total_working_hours += computed_hrs
                 records.append(AttendanceSerializer(record, context={'request': request}).data)
+                
+            total_working_hours = round(total_working_hours, 2)
 
             results.append({
                 'employee_id': emp.id,

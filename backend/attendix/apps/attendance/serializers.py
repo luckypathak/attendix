@@ -52,9 +52,12 @@ class AttendanceSerializer(serializers.ModelSerializer):
             ret['check_in_time'] = instance.check_in_time.strftime('%I:%M %p')
         if instance.check_out_time:
             ret['check_out_time'] = instance.check_out_time.strftime('%I:%M %p')
-        # Format total worked hours
-        if instance.total_worked_hours:
-            dec_hrs = float(instance.total_worked_hours)
+        # Always recompute from sessions on the fly to avoid database field caching/corruption
+        computed_hrs = instance.computed_worked_hours
+        if computed_hrs:
+            dec_hrs = float(computed_hrs)
+            ret['total_worked_hours'] = str(dec_hrs) # Override the DB field with computed truth
+            
             hrs = int(dec_hrs)
             mins = int(round((dec_hrs - hrs) * 60))
             if mins == 60:
@@ -62,6 +65,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
                 mins = 0
             ret['formatted_worked_hours'] = f"{hrs}h {mins}m"
         else:
+            ret['total_worked_hours'] = '0.00'
             ret['formatted_worked_hours'] = '0h 0m'
 
         # Add a flag to indicate if we are in the shift end window

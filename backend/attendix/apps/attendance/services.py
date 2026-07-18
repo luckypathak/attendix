@@ -262,28 +262,12 @@ class AttendanceService:
         if not all_sessions.exists():
             return
 
-        total_worked_seconds = 0.0
         first_session = all_sessions.first()
         last_session = all_sessions.last()
-        
-        has_active = False
+        has_active = attendance.sessions.filter(check_out_time__isnull=True).exists()
 
-        for session in all_sessions:
-            checkin_dt = datetime.datetime.combine(attendance.date, session.check_in_time)
-            
-            if session.check_out_time:
-                checkout_date = attendance.date
-                if session.check_out_time < session.check_in_time:
-                    checkout_date += datetime.timedelta(days=1)
-                checkout_dt = datetime.datetime.combine(checkout_date, session.check_out_time)
-                total_worked_seconds += (checkout_dt - checkin_dt).total_seconds()
-            else:
-                has_active = True
-                from django.utils import timezone
-                now_dt = timezone.localtime(timezone.now())
-                total_worked_seconds += (now_dt - timezone.make_aware(checkin_dt)).total_seconds()
-
-        total_worked_hours = round(total_worked_seconds / 3600.0, 2)
+        # Now that computed_worked_hours exists, just sync it for caching (even though serializers bypass it)
+        total_worked_hours = attendance.computed_worked_hours
         attendance.total_worked_hours = total_worked_hours
 
 
