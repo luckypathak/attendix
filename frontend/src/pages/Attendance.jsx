@@ -146,7 +146,7 @@ export default function Attendance() {
   const openPhoto = (url) => { setViewPhotoUrl(getMediaUrl(url)); setPhotoViewerOpen(true); };
   const handleFilterChange = (e) => { setFilters(prev => ({ ...prev, [e.target.name]: e.target.value })); setPage(1); };
 
-  const [overtimeRequests, setOvertimeRequests] = useState([]);
+  
   const [otModalOpen, setOtModalOpen] = useState(false);
   const [selectedRecordForOt, setSelectedRecordForOt] = useState(null);
   const [otHours, setOtHours] = useState('2.0');
@@ -851,6 +851,7 @@ export default function Attendance() {
                     Clear Filters
                   </Button>
                 </Box>
+              </>
               )}
 
               {/* ACCORDION IMPLEMENTATION */}
