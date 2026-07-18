@@ -17,6 +17,9 @@ elif [ "$COMMAND" = "web" ]; then
     # Start Celery worker in background
     celery -A attendix worker --loglevel=info &
     
+    # Remove old beat pid file if it exists, otherwise Beat might crash on restart
+    rm -f celerybeat.pid
+    
     # Start Celery beat in background
     celery -A attendix beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler &
     
