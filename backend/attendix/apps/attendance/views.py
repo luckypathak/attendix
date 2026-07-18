@@ -310,16 +310,6 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                         
             return Response({"detail": "In office."}, status=status.HTTP_200_OK)
 
-    def history(self, request):
-        # Fetch current month's history for current user
-        today = timezone.localtime(timezone.now()).date()
-        start_of_month = today.replace(day=1)
-        records = Attendance.objects.filter(
-            employee=request.user,
-            date__gte=start_of_month,
-            date__lte=today
-        ).order_by('-date')
-        return Response(AttendanceSerializer(records, many=True, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='continue-shift')
     def continue_shift(self, request, pk=None):
