@@ -89,7 +89,7 @@ def auto_absent_marker_task(self):
     
     # Simple logic: users without attendance today, whose shift started > 30 mins ago
     from attendix.apps.employee.models import EmployeeProfile
-    profiles = EmployeeProfile.objects.exclude(user__attendance__date=today).exclude(user__leaves__start_date__lte=today, user__leaves__end_date__gte=today, user__leaves__status='APPROVED').select_related('shift', 'user')
+    profiles = EmployeeProfile.objects.exclude(user__attendance_records__date=today).exclude(user__leaves__start_date__lte=today, user__leaves__end_date__gte=today, user__leaves__status='APPROVED').select_related('shift', 'user')
     
     marked = 0
     for profile in profiles:

@@ -25,7 +25,8 @@ class Company(SoftDeleteModel):
     logo_url = models.URLField(blank=True, null=True)
     domain = models.CharField(max_length=100, unique=True, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
-    
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)    
     # Company settings
     grace_period_minutes = models.IntegerField(default=15)
     late_limit_for_half_day = models.IntegerField(default=3)
