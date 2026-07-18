@@ -13,6 +13,13 @@ elif [ "$COMMAND" = "web" ]; then
     python manage.py collectstatic --no-input
     python manage.py migrate
     python manage.py seed_celery_tasks
+    
+    # Start Celery worker in background
+    celery -A attendix worker --loglevel=info &
+    
+    # Start Celery beat in background
+    celery -A attendix beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler &
+    
     exec gunicorn attendix.wsgi:application --bind 0.0.0.0:8000
 elif [ "$COMMAND" = "worker" ]; then
     exec celery -A attendix worker --loglevel=info
