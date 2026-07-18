@@ -239,16 +239,6 @@ class AttendanceService:
         total_worked_hours = round(total_worked_seconds / 3600.0, 2)
         attendance.total_worked_hours = total_worked_hours
 
-        for session in sessions:
-            checkin_dt = datetime.datetime.combine(attendance.date, session.check_in_time)
-            checkout_date = attendance.date
-            if session.check_out_time < session.check_in_time:
-                checkout_date += datetime.timedelta(days=1)
-            checkout_dt = datetime.datetime.combine(checkout_date, session.check_out_time)
-            total_worked_seconds += (checkout_dt - checkin_dt).total_seconds()
-
-        total_worked_hours = round(total_worked_seconds / 3600.0, 2)
-        attendance.total_worked_hours = total_worked_hours
 
         # Break Hours: From first check-in to last check-out (or now) total time minus worked hours
         first_in_dt = datetime.datetime.combine(attendance.date, first_session.check_in_time)

@@ -52,7 +52,7 @@ export default function LiveTracking() {
     setErrorMsg(null);
     try {
       const today = new Date().toISOString().split('T')[0];
-      const res = await api.get(`/attendance/tracking-history/?employee_id=${empId}&date=${today}`);
+      const res = await api.get(`/attendance/records/tracking-history/?employee_id=${empId}&date=${today}`);
       setHistory(res.data);
     } catch (err) {
       console.error(err);

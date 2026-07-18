@@ -139,6 +139,10 @@ class AttendanceSession(SoftDeleteModel):
         on_delete=models.CASCADE,
         related_name='sessions'
     )
+
+    class Meta:
+        ordering = ['check_in_time']
+
     check_in_time = models.TimeField()
     check_out_time = models.TimeField(null=True, blank=True)
     captured_image = models.ImageField(upload_to='attendance_photos/', null=True, blank=True)
