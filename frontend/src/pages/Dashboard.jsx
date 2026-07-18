@@ -59,7 +59,13 @@ export default function Dashboard() {
           setAttendanceData(statsRes.data.trends);
         }
       } else {
-        setEmployeeDashboard(statsData);
+        setEmployeeDashboard({
+          status: statsData?.attendance?.status || 'Pending',
+          checkedInTime: statsData?.attendance?.checked_in_time || 'Pending',
+          checkedOutTime: statsData?.attendance?.checked_out_time || 'Pending',
+          taskCompleteness: statsData?.tasks?.completeness || 'No Tasks Assigned',
+          remainingLeaves: statsData?.leaves?.remaining || '0 Days Left',
+        });
       }
     } catch (e) {
       console.error("Dashboard fetch error:", e);
@@ -344,7 +350,11 @@ export default function Dashboard() {
               <CardContent sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                   <Typography variant="h5" sx={{ fontWeight: 800 }}>Punch Status</Typography>
-                  <Chip label="Checked In" color="success" sx={{ fontWeight: 600 }} />
+                  <Chip 
+                    label={employeeDashboard.status || "Pending"} 
+                    color={employeeDashboard.status === 'Checked In' ? 'success' : employeeDashboard.status === 'Checked Out' ? 'error' : 'default'} 
+                    sx={{ fontWeight: 600 }} 
+                  />
                 </Box>
                 <Grid container spacing={2}>
                   <Grid item xs={6}>

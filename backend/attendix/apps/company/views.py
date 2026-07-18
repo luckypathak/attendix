@@ -258,6 +258,15 @@ class DashboardStatsView(APIView):
             attendance_today = Attendance.objects.filter(employee=user, date=today).first()
             checked_in_time = attendance_today.check_in_time.strftime('%I:%M %p') if (attendance_today and attendance_today.check_in_time) else 'Pending'
             checked_out_time = attendance_today.check_out_time.strftime('%I:%M %p') if (attendance_today and attendance_today.check_out_time) else 'Pending'
+            
+            # Determine current status
+            current_status = 'Pending'
+            if attendance_today:
+                if attendance_today.sessions.filter(check_out_time__isnull=True).exists():
+                    current_status = 'Checked In'
+                elif attendance_today.check_out_time:
+                    current_status = 'Checked Out'
+
             todos_today = Todo.objects.filter(employee=user).filter(Q(due_date=today) | Q(created_at__date=today))
             total_tasks = todos_today.count()
             completed_tasks = todos_today.filter(is_completed=True).count()
@@ -268,6 +277,7 @@ class DashboardStatsView(APIView):
             # Ensure full schema contract
             stats = {
                 "attendance": {
+                    "status": current_status,
                     "checked_in_time": checked_in_time,
                     "checked_out_time": checked_out_time,
                 },
