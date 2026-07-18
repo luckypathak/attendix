@@ -498,9 +498,11 @@ class AttendanceService:
                             body=f"Employee {employee.username}'s shift has ended but they are still checked in. Please approve or reject their session continuation."
                         )
                 else:
-                    # STEP 3/5: Wait timeout (15 mins from request creation)
+                    # STEP 3/5: Wait timeout (15 mins from request creation) OR if we are already far past the shift end (retrospective/catch-up)
                     request_age_mins = (now_dt - pending_request.created_at).total_seconds() / 60
-                    if request_age_mins >= 15:
+                    mins_since_shift_end = (now_dt - shift_end_dt).total_seconds() / 60
+
+                    if request_age_mins >= 15 or mins_since_shift_end >= 30:
                         # Auto checkout due to admin negligence/timeout
                         pending_request.status = 'REJECTED'
                         pending_request.rejected_reason = 'AUTO REJECTED (Timeout)'
