@@ -12,7 +12,7 @@ import {
 import { MapPin, ShieldAlert, CheckCircle, Clock, ChevronDown, ChevronRight, X, Maximize2 } from 'lucide-react';
 import api, { getMediaUrl } from '../services/api';
 
-import { getError } from '../utils/error';
+
 import { Trash2, Calendar } from 'lucide-react';
 import RaiseCorrectionModal from '../components/RaiseCorrectionModal';
 import AttendanceCorrections from '../components/AttendanceCorrections';
