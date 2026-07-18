@@ -349,7 +349,9 @@ class AttendanceService:
         has_three_strikes = profile and profile.checkout_missed_count >= 3
         has_auto_checkout_today = attendance.sessions.filter(auto_checkout=True).exists()
 
-        if (total_worked_hours < shift_hours and not has_active) or (has_three_strikes and has_auto_checkout_today):
+        # Add a 10-minute (0.17 hours) tolerance for the shift completion check
+        # This prevents 4.99 hours from being flagged as HALF_DAY on a 5.0 hour shift.
+        if (total_worked_hours < (shift_hours - 0.17) and not has_active) or (has_three_strikes and has_auto_checkout_today):
             attendance.status = Attendance.Statuses.HALF_DAY
         else:
             # If they completed the full shift, restore status from HALF_DAY to PRESENT or LATE
