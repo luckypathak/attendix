@@ -15,7 +15,7 @@ elif [ "$COMMAND" = "web" ]; then
     python manage.py seed_celery_tasks
     
     # Start Celery worker in background
-    celery -A attendix worker --loglevel=info &
+    celery -A attendix worker --loglevel=info --concurrency=1 --max-tasks-per-child=50 &
     
     # Remove old beat pid file if it exists, otherwise Beat might crash on restart
     rm -f celerybeat.pid
@@ -25,7 +25,7 @@ elif [ "$COMMAND" = "web" ]; then
     
     exec gunicorn attendix.wsgi:application --bind 0.0.0.0:8000
 elif [ "$COMMAND" = "worker" ]; then
-    exec celery -A attendix worker --loglevel=info
+    exec celery -A attendix worker --loglevel=info --concurrency=1 --max-tasks-per-child=50
 elif [ "$COMMAND" = "beat" ]; then
     exec celery -A attendix beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 else
