@@ -107,6 +107,9 @@ class PayrollBranchBreakdown(SoftDeleteModel):
         related_name='payroll_distributions'
     )
     base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    unpaid_leave_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    absent_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    advance_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     pf_deduction = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     net_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)

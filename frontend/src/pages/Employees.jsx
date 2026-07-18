@@ -136,8 +136,9 @@ export default function Employees() {
     setPfValue(emp.pf_value || '');
     setAllocations(emp.firm_allocations || []);
     if (emp.shift_start_time && emp.shift_end_time) {
-      setShiftStartTime(emp.shift_start_time);
-      setShiftEndTime(emp.shift_end_time);
+      // Format time from "11:00:00" to "11:00"
+      setShiftStartTime(emp.shift_start_time.substring(0, 5));
+      setShiftEndTime(emp.shift_end_time.substring(0, 5));
       setShiftId('CUSTOM');
     } else {
       setShiftStartTime('');
@@ -796,29 +797,42 @@ export default function Employees() {
                   );
                 })}
 
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', mt: 2 }}>
-                  <TextField
-                    select
-                    label="Add to Branch"
-                    size="small"
-                    value=""
-                    onChange={(e) => {
-                      const fId = parseInt(e.target.value);
-                      if (!allocations.find(a => a.firm === fId)) {
-                        setAllocations([...allocations, { firm: fId, base_salary: 0, pf_type: 'disabled', pf_value: 0 }]);
-                      }
-                    }}
-                    sx={{ minWidth: 200 }}
-                  >
-                    <MenuItem value="" disabled>Select Branch...</MenuItem>
-                    {firms.map(f => (
-                      <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>
-                    ))}
-                  </TextField>
-                  <Typography variant="caption" color="text.secondary">
-                    Add branch splits if employee splits shifts or duties.
-                  </Typography>
-                </Box>
+                {(() => {
+                  const unassignedFirms = firms.filter(f => !allocations.some(a => a.firm === f.id));
+                  if (unassignedFirms.length === 0) {
+                    return (
+                      <Typography variant="body2" color="success.main" sx={{ mt: 2, fontWeight: 600 }}>
+                        <CheckCircle size={14} style={{ marginRight: 4, verticalAlign: 'text-bottom' }} />
+                        Employee is already assigned to all available branches.
+                      </Typography>
+                    );
+                  }
+                  return (
+                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', mt: 2 }}>
+                      <TextField
+                        select
+                        label="Add to Branch"
+                        size="small"
+                        value=""
+                        onChange={(e) => {
+                          const fId = parseInt(e.target.value);
+                          if (!allocations.find(a => a.firm === fId)) {
+                            setAllocations([...allocations, { firm: fId, base_salary: 0, pf_type: 'disabled', pf_value: 0 }]);
+                          }
+                        }}
+                        sx={{ minWidth: 200 }}
+                      >
+                        <MenuItem value="" disabled>Select Branch...</MenuItem>
+                        {unassignedFirms.map(f => (
+                          <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>
+                        ))}
+                      </TextField>
+                      <Typography variant="caption" color="text.secondary">
+                        Add branch splits if employee splits shifts or duties.
+                      </Typography>
+                    </Box>
+                  );
+                })()}
               </Grid>
             </Grid>
 

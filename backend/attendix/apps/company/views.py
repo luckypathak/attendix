@@ -234,7 +234,7 @@ class DashboardStatsView(APIView):
             for session in recent_auto_checkouts:
                 from attendix.apps.attendance.models import AttendanceAuditLog
                 reason = "AUTO_CHECKOUT"
-                log = AttendanceAuditLog.objects.filter(session=session).first()
+                log = AttendanceAuditLog.objects.filter(session=session).order_by('-created_at').first()
                 if log:
                     reason = log.reason
                 
@@ -328,7 +328,7 @@ class DashboardStatsView(APIView):
             for session in recent_auto_checkouts:
                 from attendix.apps.attendance.models import AttendanceAuditLog
                 reason = "AUTO_CHECKOUT"
-                log = AttendanceAuditLog.objects.filter(session=session).first()
+                log = AttendanceAuditLog.objects.filter(session=session).order_by('-created_at').first()
                 if log:
                     reason = log.reason
                 
@@ -477,7 +477,7 @@ class DashboardStatsView(APIView):
             for session in recent_auto_checkouts:
                 from attendix.apps.attendance.models import AttendanceAuditLog
                 reason = "AUTO_CHECKOUT"
-                log = AttendanceAuditLog.objects.filter(session=session).first()
+                log = AttendanceAuditLog.objects.filter(session=session).order_by('-created_at').first()
                 if log:
                     reason = log.reason
                 
@@ -576,7 +576,7 @@ class DashboardStatsView(APIView):
             for session in recent_auto_checkouts:
                 from attendix.apps.attendance.models import AttendanceAuditLog
                 reason = "AUTO_CHECKOUT"
-                log = AttendanceAuditLog.objects.filter(session=session).first()
+                log = AttendanceAuditLog.objects.filter(session=session).order_by('-created_at').first()
                 if log:
                     reason = log.reason
                 

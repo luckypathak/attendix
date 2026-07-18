@@ -45,8 +45,8 @@ class EmployeeDetailsSerializer(serializers.ModelSerializer):
     firm_name = serializers.CharField(source='user.firm.name', read_only=True)
     shift_id = serializers.IntegerField(required=False, allow_null=True)
     shift_name = serializers.CharField(source='shift.name', read_only=True)
-    shift_start_time = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    shift_end_time = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    shift_start_time = serializers.TimeField(source='shift.start_time', read_only=True)
+    shift_end_time = serializers.TimeField(source='shift.end_time', read_only=True)
     firm_allocations = EmployeeFirmAllocationSerializer(many=True, required=False)
 
     class Meta:

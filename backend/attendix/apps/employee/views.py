@@ -27,11 +27,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # Admin optional query param scoping
         firm_id = self.request.query_params.get('firm')
         if firm_id and firm_id != 'ALL' and firm_id != 'undefined':
+            from django.db.models import Q
             try:
-                base_qs = base_qs.filter(user__firm_id=int(firm_id))
+                base_qs = base_qs.filter(
+                    Q(user__firm_id=int(firm_id)) | Q(firm_allocations__firm_id=int(firm_id))
+                ).distinct()
             except ValueError:
                 pass
-            
         return base_qs
 
 

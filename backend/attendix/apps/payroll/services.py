@@ -144,15 +144,14 @@ class PayrollService:
         total_net_salary = 0.0
         total_unpaid_leave_deduction = 0.0
         total_absent_deduction = 0.0
+        total_advance_deduction = advance_deduction
 
         if allocations.exists():
-            total_alloc_base_salary = sum(float(a.base_salary) for a in allocations)
-            
             for alloc in allocations:
                 b_base = float(alloc.base_salary)
-                ratio = b_base / total_alloc_base_salary if total_alloc_base_salary > 0 else (1.0 / len(allocations))
                 
-                b_daily_rate = b_base / days_in_month
+                # Each branch independently calculates daily rate and deductions
+                b_daily_rate = b_base / days_in_month if days_in_month > 0 else 0
                 b_unpaid_leave_deduction = round(b_daily_rate * unpaid_leaves, 2)
                 b_absent_deduction = round(b_daily_rate * absent_days, 2)
                 b_earned_basic = max(0.0, b_base - b_unpaid_leave_deduction - b_absent_deduction)
@@ -164,7 +163,12 @@ class PayrollService:
                 elif alloc.pf_type == 'flat':
                     b_pf = float(alloc.pf_value)
                 
-                # Proportional calculations
+                # Proportional assignment for generic additions/deductions (Overtime, Bonus, Advance, Already Paid)
+                # We calculate ratio based on this branch's base relative to total alloc base, 
+                # so the overall totals sum up correctly.
+                total_alloc_base = sum(float(a.base_salary) for a in allocations)
+                ratio = b_base / total_alloc_base if total_alloc_base > 0 else (1.0 / len(allocations))
+                
                 b_ot_pay = ot_pay * ratio
                 b_bonus = float(bonus) * ratio
                 b_advance_deduct = advance_deduction * ratio
@@ -180,7 +184,16 @@ class PayrollService:
                 total_unpaid_leave_deduction += b_unpaid_leave_deduction
                 total_absent_deduction += b_absent_deduction
 
-                branch_details.append((alloc, b_base, b_gross, b_pf, b_net))
+                branch_details.append({
+                    'firm': alloc.firm,
+                    'base': b_base,
+                    'gross': b_gross,
+                    'pf': b_pf,
+                    'unpaid_leave_deduction': b_unpaid_leave_deduction,
+                    'absent_deduction': b_absent_deduction,
+                    'advance_deduction': b_advance_deduct,
+                    'net': b_net
+                })
         else:
             # Single branch fallback
             daily_rate = base_salary / days_in_month
@@ -230,18 +243,21 @@ class PayrollService:
         # Sync branch distributions
         if allocations.exists():
             existing_breakdowns = {b.firm.id: b for b in payroll.branch_distributions.all()}
-            for alloc, b_base, b_gross, b_pf, b_net in branch_details:
+            for details in branch_details:
                 PayrollBranchBreakdown.objects.update_or_create(
                     payroll=payroll,
-                    firm=alloc.firm,
+                    firm=details['firm'],
                     defaults={
-                        'base_salary': b_base,
-                        'gross_salary': b_gross,
-                        'pf_deduction': b_pf,
-                        'net_salary': b_net
+                        'base_salary': details['base'],
+                        'unpaid_leave_deduction': details['unpaid_leave_deduction'],
+                        'absent_deduction': details['absent_deduction'],
+                        'advance_deduction': details['advance_deduction'],
+                        'gross_salary': details['gross'],
+                        'pf_deduction': details['pf'],
+                        'net_salary': details['net']
                     }
                 )
-                existing_breakdowns.pop(alloc.firm.id, None)
+                existing_breakdowns.pop(details['firm'].id, None)
             for b in existing_breakdowns.values():
                 b.delete()
         else:
@@ -251,12 +267,14 @@ class PayrollService:
                     firm=employee.firm,
                     defaults={
                         'base_salary': base_salary,
+                        'unpaid_leave_deduction': total_unpaid_leave_deduction,
+                        'absent_deduction': total_absent_deduction,
+                        'advance_deduction': advance_deduction,
                         'gross_salary': total_gross_salary,
                         'pf_deduction': total_pf_deduction,
                         'net_salary': total_net_salary
                     }
                 )
-
         return payroll
 
     @classmethod
