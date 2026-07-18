@@ -13,6 +13,10 @@ import { MapPin, ShieldAlert, CheckCircle, Clock, ChevronDown, ChevronRight, X, 
 import api, { getMediaUrl } from '../services/api';
 import { formatDate } from '../utils/format';
 import EditAttendanceModal from '../components/EditAttendanceModal';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 
 
 // --- STYLED COMPONENTS & HELPERS ---
@@ -636,15 +640,18 @@ export default function Attendance() {
 
               {isAdmin && (
                 <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-                  <TextField 
-                    size="small" 
-                    type="date" 
-                    name="date" 
-                    label="Date" 
-                    InputLabelProps={{ shrink: true }}
-                    value={filters.date} 
-                    onChange={handleFilterChange} 
-                  />
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      label="Date"
+                      format="DD/MM/YYYY"
+                      value={filters.date ? dayjs(filters.date, 'YYYY-MM-DD') : null}
+                      onChange={(newValue) => {
+                        setFilters(prev => ({ ...prev, date: newValue ? newValue.format('YYYY-MM-DD') : '' }));
+                        setPage(1);
+                      }}
+                      slotProps={{ textField: { size: 'small' } }}
+                    />
+                  </LocalizationProvider>
                   <TextField 
                     size="small" 
                     name="employee" 

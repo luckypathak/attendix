@@ -6,7 +6,7 @@ export const formatDate = (dateStr) => {
   const parts = dateStr.split('-');
   if (parts.length === 3) {
     if (parts[0].length === 4) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
   }
   try {
@@ -15,7 +15,7 @@ export const formatDate = (dateStr) => {
       const dd = String(d.getDate()).padStart(2, '0');
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const yyyy = d.getFullYear();
-      return `${dd}-${mm}-${yyyy}`;
+      return `${dd}/${mm}/${yyyy}`;
     }
   } catch (e) {}
   return dateStr;
@@ -34,7 +34,7 @@ export const formatDateTime = (dateTimeStr) => {
       const yyyy = d.getFullYear();
       const hh = String(d.getHours()).padStart(2, '0');
       const min = String(d.getMinutes()).padStart(2, '0');
-      return `${dd}-${mm}-${yyyy} ${hh}:${min}`;
+      return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
     }
   } catch (e) {}
   return dateTimeStr;
