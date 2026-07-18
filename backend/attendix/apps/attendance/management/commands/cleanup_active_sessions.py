@@ -76,6 +76,13 @@ class Command(BaseCommand):
                     session.ot_status = 'REJECTED'
                     session.save()
                     
+                    # Increment missed checkout count transactionally
+                    from django.db.models import F
+                    profile = getattr(session.attendance.employee, 'employee_profile', None)
+                    if profile:
+                        profile.checkout_missed_count = F('checkout_missed_count') + 1
+                        profile.save(update_fields=['checkout_missed_count'])
+                    
                     # Recalculate
                     AttendanceService._recalculate_attendance_metrics(session.attendance, shift, att_date)
                     

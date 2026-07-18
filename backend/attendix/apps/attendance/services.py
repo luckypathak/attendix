@@ -414,8 +414,10 @@ class AttendanceService:
                     profile = getattr(employee, 'employee_profile', None)
                     missed_count = 1
                     if profile:
-                        profile.checkout_missed_count += 1
-                        profile.save()
+                        from django.db.models import F
+                        profile.checkout_missed_count = F('checkout_missed_count') + 1
+                        profile.save(update_fields=['checkout_missed_count'])
+                        profile.refresh_from_db()
                         missed_count = profile.checkout_missed_count
 
                     # Use the actual time the auto checkout job runs, rather than backdating to window_end
