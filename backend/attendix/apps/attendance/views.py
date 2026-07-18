@@ -172,6 +172,17 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return Response({"detail": msg}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['get'], url_path='history')
+    def history(self, request):
+        # Fetch current month's history for current user
+        from django.utils import timezone
+        today = timezone.localtime(timezone.now()).date()
+        start_of_month = today.replace(day=1)
+        records = Attendance.objects.filter(
+            employee=request.user,
+            date__gte=start_of_month,
+            date__lte=today
+        ).order_by('-date')
+        return Response(AttendanceSerializer(records, many=True, context={'request': request}).data)
 
     @action(detail=False, methods=['post'], url_path='ping')
     def ping(self, request):
