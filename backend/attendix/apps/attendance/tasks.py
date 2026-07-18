@@ -6,7 +6,7 @@ from datetime import timedelta
 import datetime
 from django.db import connection
 from attendix.apps.attendance.models import Attendance, AttendanceSession, LocationPing, AttendanceCorrectionRequest
-from authentication.models import User
+from attendix.apps.authentication.models import User
 from attendix.apps.notifications.services import NotificationService
 
 logger = logging.getLogger(__name__)
