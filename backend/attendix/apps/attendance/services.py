@@ -508,9 +508,8 @@ class AttendanceService:
                         pending_request.rejected_reason = 'AUTO REJECTED (Timeout)'
                         pending_request.save()
                         
-                        # Use exact timeout boundary (shift end + 30 mins) if we are very late (server down)
-                        ideal_checkout = shift_end_dt + datetime.timedelta(minutes=30)
-                        final_checkout_dt = ideal_checkout if mins_since_shift_end > 45 else now_dt
+                        # Set checkout EXACTLY at shift end time (as requested by user)
+                        final_checkout_dt = shift_end_dt
 
                         cls._perform_auto_checkout(session, employee, attendance, final_checkout_dt, shift)
 
