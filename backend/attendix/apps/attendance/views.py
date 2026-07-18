@@ -202,15 +202,17 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         work_category = profile.work_category if profile else 'OFFICE'
         company = request.user.company
         
+        # ALL STAFF MUST BE TRACKED IN DB
+        from .models import LocationPing
+        LocationPing.objects.create(
+            session=session,
+            latitude=latitude,
+            longitude=longitude,
+            speed=speed,
+            accuracy=accuracy
+        )
+        
         if work_category == 'FIELD':
-            from .models import LocationPing
-            LocationPing.objects.create(
-                session=session,
-                latitude=latitude,
-                longitude=longitude,
-                speed=speed,
-                accuracy=accuracy
-            )
             return Response({"detail": "Location ping saved."}, status=status.HTTP_200_OK)
         else:
             # OFFICE STAFF logic

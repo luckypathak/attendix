@@ -148,6 +148,16 @@ class AttendanceService:
             session.captured_image.save(captured_image.name, ContentFile(img_content), save=False)
             captured_image.seek(0)
         session.save()
+        
+        # User Requirement: The map should appear immediately after first check in.
+        # Save the very first location ping so the tracking map has a starting point immediately.
+        from .models import LocationPing
+        LocationPing.objects.create(
+            session=session,
+            latitude=lat,
+            longitude=lng,
+            accuracy=accuracy
+        )
 
         return attendance
 
