@@ -1,75 +1,27 @@
-from rest_framework import viewsets, permissions
-from .models import Company, Department, Designation, Firm
-from .serializers import CompanySerializer, DepartmentSerializer, DesignationSerializer, FirmSerializer
+import os, sys, re
 
+filepath = "attendix/apps/company/views.py"
+with open(filepath, 'r') as f:
+    content = f.read()
 
-class IsCompanyAdminOrSuperAdmin(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role in ['SUPER_ADMIN', 'COMPANY_ADMIN']
+# We want to replace everything from `class DashboardStatsView(APIView):` 
+# up to the next class or end of file, with a clean version.
 
+import re
+# Find the start of DashboardStatsView
+start_idx = content.find("class DashboardStatsView(APIView):")
+# Find the end (next class or end)
+end_idx = content.find("class ", start_idx + 10)
+if end_idx == -1:
+    end_idx = len(content)
 
-class TenantModelViewSet(viewsets.ModelViewSet):
-    permission_classes = [permissions.IsAuthenticated]
+original_class = content[start_idx:end_idx]
 
-    def get_queryset(self):
-        user = self.request.user
-        if user.role == 'SUPER_ADMIN':
-            return self.queryset
-        
-        # If model is Company itself, filter by pk
-        if self.queryset.model == Company:
-            return self.queryset.filter(pk=user.company_id)
-            
-        return self.queryset.filter(company=user.company)
-
-    def perform_create(self, serializer):
-        # Automatically assign company from user if not super admin
-        if self.request.user.role != 'SUPER_ADMIN':
-            serializer.save(company=self.request.user.company)
-        else:
-            serializer.save()
-
-
-class CompanyViewSet(TenantModelViewSet):
-    queryset = Company.objects.all()
-    serializer_class = CompanySerializer
-    
-    def get_permissions(self):
-        if self.action in ['create', 'destroy']:
-            return [permissions.IsAdminUser()] # Only django staff / absolute superadmins can create companies
-        return [IsCompanyAdminOrSuperAdmin()]
-
-
-class DepartmentViewSet(TenantModelViewSet):
-    queryset = Department.objects.all()
-    serializer_class = DepartmentSerializer
-
-
-class DesignationViewSet(TenantModelViewSet):
-    queryset = Designation.objects.all()
-    serializer_class = DesignationSerializer
-
-
-class FirmViewSet(TenantModelViewSet):
-    queryset = Firm.objects.all()
-    serializer_class = FirmSerializer
-
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from django.utils import timezone
-from django.db.models import Q
-from attendix.apps.employee.models import EmployeeProfile
-from attendix.apps.attendance.models import Attendance
-from attendix.apps.leave.models import LeaveRequest, LeaveBalance
-from attendix.apps.todo.models import Todo
-
-class DashboardStatsView(APIView):
+# I will write the clean class and inject it
+clean_class = """class DashboardStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from django.utils import timezone
-        import datetime
         user = request.user
         today = timezone.localdate()
         from django.db.models import Sum, Count
@@ -143,15 +95,13 @@ class DashboardStatsView(APIView):
             reimbs = Reimbursement.objects.filter(**base_q)
             reims_paid = reimbs.filter(status='APPROVED').aggregate(Sum('amount'))['amount__sum'] or 0
             reims_pending = reimbs.filter(status='PENDING').aggregate(Sum('amount'))['amount__sum'] or 0
-            
-            from django.utils import timezone
-            this_month_start_dt = timezone.make_aware(datetime.datetime.combine(this_month_start, datetime.time.min))
-            reims_month = reimbs.filter(status='APPROVED', created_at__gte=this_month_start_dt).aggregate(Sum('amount'))['amount__sum'] or 0
+            reims_month = reimbs.filter(status='APPROVED', created_at__gte=this_month_start).aggregate(Sum('amount'))['amount__sum'] or 0
 
             # Reimbursement Graph Data
+            import datetime
             reims_graph = []
             for i in range(5, -1, -1):
-                m_date = today - timedelta(days=i*30)
+                m_date = today - datetime.timedelta(days=i*30)
                 m_start = m_date.replace(day=1)
                 m_val = reimbs.filter(status='APPROVED', created_at__year=m_start.year, created_at__month=m_start.month).aggregate(Sum('amount'))['amount__sum'] or 0
                 reims_graph.append({
@@ -160,11 +110,10 @@ class DashboardStatsView(APIView):
                 })
 
             # 5. Advance Salary
-            from django.db.models import F
             advs = AdvanceSalary.objects.filter(**base_q)
             adv_given = advs.filter(status='APPROVED').aggregate(Sum('amount'))['amount__sum'] or 0
-            pending_recovery = advs.filter(status='APPROVED').annotate(pending=F('amount') - F('repaid_amount')).aggregate(Sum('pending'))['pending__sum'] or 0
-            recovered_this_month = advs.filter(status='APPROVED', created_at__gte=this_month_start_dt).aggregate(Sum('amount'))['amount__sum'] or 0 # simplification
+            pending_recovery = advs.filter(status='APPROVED').aggregate(Sum('remaining_amount'))['remaining_amount__sum'] or 0
+            recovered_this_month = advs.filter(status='APPROVED', created_at__gte=this_month_start).aggregate(Sum('amount'))['amount__sum'] or 0 # simplification
 
             # 6. Payroll
             payrolls = Payroll.objects.filter(**base_q)
@@ -229,7 +178,7 @@ class DashboardStatsView(APIView):
             for session in recent_auto_checkouts:
                 from attendix.apps.attendance.models import AttendanceAuditLog
                 reason = "AUTO_CHECKOUT"
-                log = AttendanceAuditLog.objects.filter(session=session).order_by('-edited_at').first()
+                log = AttendanceAuditLog.objects.filter(session=session).order_by('-created_at').first()
                 if log:
                     reason = log.reason
                 
@@ -283,3 +232,10 @@ class DashboardStatsView(APIView):
                 "stats": stats,
                 "trends": []
             })
+"""
+
+new_content = content[:start_idx] + clean_class + content[end_idx:]
+with open(filepath, 'w') as f:
+    f.write(new_content)
+
+print("DashboardStatsView rewritten.")

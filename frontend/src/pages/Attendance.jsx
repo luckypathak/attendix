@@ -658,7 +658,7 @@ export default function Attendance() {
               </Typography>
 
               {isAdmin && (
-                <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
                       label="Date"
@@ -670,9 +670,9 @@ export default function Attendance() {
                       }}
                       slotProps={{ 
                         textField: { 
-                          size: 'medium', 
+                          size: 'small', 
                           variant: 'outlined',
-                          sx: { width: '200px', '& .MuiInputBase-root': { py: 0.5 } }
+                          sx: { minWidth: 180 }
                         } 
                       }}
                     />
@@ -683,10 +683,11 @@ export default function Attendance() {
                     label="Employee Name" 
                     value={filters.employee} 
                     onChange={handleFilterChange} 
+                    sx={{ minWidth: 180 }}
                   />
-                  <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>Status</InputLabel>
-                    <Select name="status" value={filters.status} label="Status" onChange={handleFilterChange}>
+                  <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel id="status-label">Status</InputLabel>
+                    <Select labelId="status-label" name="status" value={filters.status} label="Status" onChange={handleFilterChange}>
                       <MenuItem value="">All</MenuItem>
                       <MenuItem value="PRESENT">Present</MenuItem>
                       <MenuItem value="LATE">Late</MenuItem>
@@ -694,9 +695,9 @@ export default function Attendance() {
                       <MenuItem value="ABSENT">Absent</MenuItem>
                     </Select>
                   </FormControl>
-                  <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>Auto Checkout</InputLabel>
-                    <Select name="autoCheckout" value={filters.autoCheckout} label="Auto Checkout" onChange={handleFilterChange}>
+                  <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel id="autocheckout-label">Auto Checkout</InputLabel>
+                    <Select labelId="autocheckout-label" name="autoCheckout" value={filters.autoCheckout} label="Auto Checkout" onChange={handleFilterChange}>
                       <MenuItem value="">All</MenuItem>
                       <MenuItem value="true">Yes</MenuItem>
                       <MenuItem value="false">No</MenuItem>
