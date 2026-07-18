@@ -103,8 +103,6 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 msg = msg[2:-2]
             return Response({"detail": msg}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=['post'], url_path='check-out')
-
     @action(detail=False, methods=['get'], url_path='tracking-history')
     def tracking_history(self, request):
         employee_id = request.query_params.get('employee_id')
@@ -151,6 +149,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'pings': data
         }, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'], url_path='check-out')
     def check_out(self, request):
         serializer = CheckOutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

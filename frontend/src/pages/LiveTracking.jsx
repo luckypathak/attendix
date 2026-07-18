@@ -67,7 +67,7 @@ export default function LiveTracking() {
     }
   };
 
-  const selectedEmp = employees.find(e => e.id === parseInt(selectedEmpId));
+  const selectedEmp = employees.find(e => e.user_id === parseInt(selectedEmpId));
 
   return (
     <Box p={3} maxWidth="1200px" mx="auto">
@@ -85,7 +85,7 @@ export default function LiveTracking() {
                 onChange={(e) => setSelectedEmpId(e.target.value)}
               >
                 {employees.map(emp => (
-                  <MenuItem key={emp.id} value={emp.id}>
+                  <MenuItem key={emp.user_id} value={emp.user_id}>
                     {emp.first_name} {emp.last_name} ({emp.work_category === 'FIELD' ? 'Field' : 'Office'})
                   </MenuItem>
                 ))}

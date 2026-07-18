@@ -84,7 +84,7 @@ export default function Dashboard() {
       </Box>
 
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress, Dialog, DialogTitle, DialogContent, Accordion, AccordionSummary, AccordionDetails, Table, TableBody, TableCell, TableHead, TableRow, TableContainer, Paper, IconButton /></Box>
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
       ) : isAdmin ? (
         // ==========================================
         // ADMIN DASHBOARD
