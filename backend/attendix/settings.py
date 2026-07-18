@@ -30,6 +30,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'drf_spectacular',
+    'django_celery_beat',
+    'django_celery_results',
     
     # Custom apps
     'attendix.apps.authentication',
@@ -179,24 +181,18 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Celery Configuration
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/1')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
+# Use the REDIS_URL provided by Upstash
+CELERY_BROKER_URL = os.getenv('REDIS_URL', os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/1'))
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_CACHE_BACKEND = 'default'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
+CELERY_TIMEZONE = 'Asia/Kolkata'
 
-from celery.schedules import crontab
-CELERY_BEAT_SCHEDULE = {
-    'cleanup-old-attendance-photos': {
-        'task': 'attendix.apps.attendance.tasks.cleanup_attendance_photos_task',
-        'schedule': crontab(hour=0, minute=0),
-    },
-    'check-active-overtimes': {
-        'task': 'attendix.apps.attendance.tasks.check_active_overtimes_task',
-        'schedule': crontab(minute='*'),
-    },
-}
+# Use django-celery-beat for database-backed scheduling
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
 
 # SMS Gateway Config
 SMS_GATEWAY_API_KEY = os.getenv('SMS_GATEWAY_API_KEY', 'attendix_gateway_secret_api_key_123')

@@ -34,10 +34,4 @@ urlpatterns += [
     re_path(r'^media/(?P<path>.*)$', serve_database_file, name='serve_media'),
 ]
 
-# Start background daemon thread for Auto Checkout so it runs natively on Render without Celery
-try:
-    from attendix.background import start_background_tasks
-    start_background_tasks()
-except Exception as e:
-    print("Could not start background tasks:", e)
 

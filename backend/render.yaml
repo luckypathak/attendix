@@ -1,0 +1,65 @@
+services:
+  # 1. Django Web Service
+  - type: web
+    name: attendix-api
+    env: python
+    buildCommand: "./start.sh build"
+    startCommand: "./start.sh web"
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: attendix-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "*" # Change this in production
+        
+  # 2. Celery Worker (Background tasks processing)
+  - type: worker
+    name: attendix-celery-worker
+    env: python
+    buildCommand: "./start.sh build"
+    startCommand: "./start.sh worker"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: attendix-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+
+  # 3. Celery Beat (Scheduled task sender)
+  - type: worker
+    name: attendix-celery-beat
+    env: python
+    buildCommand: "./start.sh build"
+    startCommand: "./start.sh beat"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: attendix-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+
+databases:
+  - name: attendix-db
+    databaseName: attendix
+    user: attendix_user
+    plan: starter
