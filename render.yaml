@@ -16,8 +16,36 @@ services:
         value: "*"
       - key: CORS_ALLOW_ALL_ORIGINS
         value: "True"
+      - key: REDIS_URL
+        value: rediss://default:gQAAAAAAAsiCAAIgcDFmY2Q5ZGQ4NjkwZGQ0N2U2ODE0NzBlYTA5MzY3ZTk0NQ@divine-unicorn-182402.upstash.io:6379
 
-  # 2. React Frontend Static Site
+  # 2. Celery Worker (Task Executor)
+  - type: worker
+    name: attendix-celery-worker
+    runtime: python
+    rootDir: "backend"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "./start.sh worker"
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_yNGsD6wpd7Fg@ep-flat-tree-at7ps4y8.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - key: REDIS_URL
+        value: rediss://default:gQAAAAAAAsiCAAIgcDFmY2Q5ZGQ4NjkwZGQ0N2U2ODE0NzBlYTA5MzY3ZTk0NQ@divine-unicorn-182402.upstash.io:6379
+
+  # 3. Celery Beat (Task Scheduler)
+  - type: worker
+    name: attendix-celery-beat
+    runtime: python
+    rootDir: "backend"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "./start.sh beat"
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_yNGsD6wpd7Fg@ep-flat-tree-at7ps4y8.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - key: REDIS_URL
+        value: rediss://default:gQAAAAAAAsiCAAIgcDFmY2Q5ZGQ4NjkwZGQ0N2U2ODE0NzBlYTA5MzY3ZTk0NQ@divine-unicorn-182402.upstash.io:6379
+
+  # 4. React Frontend Static Site
   - type: web
     name: attendix-frontend
     runtime: static
