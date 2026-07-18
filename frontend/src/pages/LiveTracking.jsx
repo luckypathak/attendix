@@ -41,7 +41,7 @@ export default function LiveTracking() {
   const fetchEmployees = async () => {
     try {
       const res = await api.get('/employees/');
-      setEmployees(res.data);
+      setEmployees(res.data.results || res.data);
     } catch (err) {
       console.error(err);
     }
