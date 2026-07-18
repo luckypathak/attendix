@@ -465,6 +465,14 @@ class AttendanceService:
                 # If session is already explicitly continued or OT approved, skip
                 if session.continue_shift or session.ot_status == 'APPROVED':
                     continue
+                    
+                # PRE-CONTINUE SHIFT: If admin pre-approved them to continue working (e.g. they came late),
+                # allow them to work up to their total shift duration without auto-checkout or OT.
+                if session.pre_continue_approved:
+                    current_worked_hours = float(attendance.computed_worked_hours)
+                    shift_duration = float(shift.duration_hours)
+                    if current_worked_hours < shift_duration:
+                        continue # Skip them, let them finish their regular hours
 
                 # STEP 1: Check for existing pending request
                 pending_request = AttendanceCorrectionRequest.objects.filter(

@@ -256,6 +256,17 @@ export default function Attendance() {
     }
   };
 
+  const handlePreContinue = async (empRec) => {
+    try {
+      const res = await api.post(`/attendance/records/${empRec.id}/pre-continue/`);
+      alert(res.data.detail);
+      fetchAdminRecords();
+    } catch (e) {
+      alert("Failed to pre-continue shift: " + (e.response?.data?.detail || e.message));
+    }
+  };
+
+
   const renderSessions = (empRec) => {
     if (!empRec.sessions || empRec.sessions.length === 0) {
       return <Typography variant="caption" color="text.secondary">No sessions recorded.</Typography>;
@@ -898,9 +909,14 @@ export default function Attendance() {
                                         <Typography sx={{ fontWeight: 600, minWidth: 120 }}>{formatDate(dateStr)}</Typography>
                                         <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
                                         <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
-                                        <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ ml: 'auto', fontSize: '0.7rem' }}>
-                                          Pre-Approve OT
-                                        </Button>
+                                        <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+                                          <Button size="small" variant="outlined" color="secondary" onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                            Pre-Continue
+                                          </Button>
+                                          <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                            Pre-Approve OT
+                                          </Button>
+                                        </Box>
                                       </Box>
                                     </AccordionSummary>
                                     <AccordionDetails sx={{ p: 2, pt: 0 }}>
@@ -962,9 +978,14 @@ export default function Attendance() {
                                         <Typography sx={{ fontWeight: 600, minWidth: 150 }}>{empRec.employee_name}</Typography>
                                         <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
                                         <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
-                                        <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ ml: 'auto', fontSize: '0.7rem' }}>
-                                          Pre-Approve OT
-                                        </Button>
+                                        <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+                                          <Button size="small" variant="outlined" color="secondary" onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                            Pre-Continue
+                                          </Button>
+                                          <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                            Pre-Approve OT
+                                          </Button>
+                                        </Box>
                                       </Box>
                                     </AccordionSummary>
                                     <AccordionDetails sx={{ p: 2, pt: 0 }}>

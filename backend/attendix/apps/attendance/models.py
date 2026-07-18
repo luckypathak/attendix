@@ -212,6 +212,7 @@ class AttendanceSession(SoftDeleteModel):
 
     # Shift Continuation & Overtime Request fields
     continue_shift = models.BooleanField(default=False)
+    pre_continue_approved = models.BooleanField(default=False)
     continue_clicked_at = models.DateTimeField(null=True, blank=True)
     ot_requested = models.BooleanField(default=False)
     ot_requested_at = models.DateTimeField(null=True, blank=True)

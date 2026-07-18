@@ -422,6 +422,20 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             )
         return Response(OvertimeSerializer(ot).data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='pre-continue')
+    def pre_continue(self, request, pk=None):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            return Response({"detail": "Only managers/admins can pre-continue shifts."}, status=status.HTTP_403_FORBIDDEN)
+        
+        attendance = self.get_object()
+        session = attendance.sessions.order_by('-created_at').first()
+        if not session or session.check_out_time:
+            return Response({"detail": "No active session found."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        session.pre_continue_approved = not session.pre_continue_approved
+        session.save()
+        return Response({"detail": "Pre-Continue toggled successfully.", "pre_continue_approved": session.pre_continue_approved}, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['patch'], url_path='edit-session')
     def edit_session(self, request):
         if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
