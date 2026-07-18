@@ -98,7 +98,7 @@ export default function EditAttendanceModal({ open, onClose, session, onSaved })
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700 }}>Edit Attendance Session</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 700 }}>Edit Attendance: {session?.employee_name || 'Session'}</DialogTitle>
       <DialogContent dividers>
         {errorMsg && <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>}
         

@@ -785,7 +785,7 @@ export default function Attendance() {
                                             {/* Actions */}
                                             <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
                                               <Button size="small" variant="outlined" onClick={() => {
-                                                const sessWithParentStatus = { ...sess, parent_status: empRec.status };
+                                                const sessWithParentStatus = { ...sess, parent_status: empRec.status, employee_name: empRec.employee_name };
                                                 setSelectedSessionForEdit(sessWithParentStatus);
                                                 setEditModalOpen(true);
                                               }}>Edit</Button>

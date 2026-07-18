@@ -119,6 +119,19 @@ export default function Employees() {
     setFormMessage(null);
   };
 
+
+  const convertTo24Hour = (timeStr) => {
+    if (!timeStr) return '';
+    if (timeStr.match(/^\d{2}:\d{2}$/)) return timeStr; // already 24h
+    const match = timeStr.match(/(\d+):(\d+)\s?(AM|PM)/i);
+    if (!match) return timeStr;
+    let [_, h, m, period] = match;
+    h = parseInt(h);
+    if (period.toUpperCase() === 'PM' && h < 12) h += 12;
+    if (period.toUpperCase() === 'AM' && h === 12) h = 0;
+    return `${h.toString().padStart(2, '0')}:${m}`;
+  };
+
   const handleEditClick = (emp) => {
     setEditingEmployee(emp);
     setUsername(emp.username);
@@ -136,9 +149,8 @@ export default function Employees() {
     setPfValue(emp.pf_value || '');
     setAllocations(emp.firm_allocations || []);
     if (emp.shift_start_time && emp.shift_end_time) {
-      // Format time from "11:00:00" to "11:00"
-      setShiftStartTime(emp.shift_start_time.substring(0, 5));
-      setShiftEndTime(emp.shift_end_time.substring(0, 5));
+      setShiftStartTime(convertTo24Hour(emp.shift_start_time));
+      setShiftEndTime(convertTo24Hour(emp.shift_end_time));
       setShiftId('CUSTOM');
     } else {
       setShiftStartTime('');
@@ -437,13 +449,32 @@ export default function Employees() {
                       <TableCell sx={{ fontWeight: 600 }}>{emp.username}</TableCell>
                       <TableCell>{emp.first_name || '--'} {emp.last_name || ''}</TableCell>
                       <TableCell>
-                        <Chip 
-                          label={emp.firm_name || 'No Branch'} 
-                          size="small" 
-                          variant="outlined"
-                          color={emp.firm_name ? "primary" : "default"}
-                          sx={{ fontWeight: 600, fontSize: '0.7rem' }}
-                        />
+                        {emp.firm_allocations && emp.firm_allocations.length > 0 ? (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {emp.firm_allocations.map(alloc => (
+                              <Chip 
+                                key={alloc.id}
+                                label={alloc.firm_name || 'No Branch'} 
+                                size="small"
+                                variant="outlined" 
+                                color="primary"
+                                sx={{ 
+                                  fontWeight: 600, 
+                                  fontSize: '0.7rem',
+                                  width: 'fit-content'
+                                }} 
+                              />
+                            ))}
+                          </Box>
+                        ) : (
+                          <Chip 
+                            label={emp.firm_name || 'No Branch'} 
+                            size="small" 
+                            variant="outlined"
+                            color={emp.firm_name ? "primary" : "default"}
+                            sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                          />
+                        )}
                       </TableCell>
                       <TableCell>
                         <Chip 
