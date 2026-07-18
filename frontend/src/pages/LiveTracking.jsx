@@ -96,9 +96,15 @@ export default function LiveTracking() {
               <Box>
                 <Typography variant="body1"><strong>Name:</strong> {selectedEmp.first_name} {selectedEmp.last_name}</Typography>
                 <Typography variant="body1"><strong>Category:</strong> {selectedEmp.work_category}</Typography>
-                {history && history.pings && history.pings.length > 0 && (
+                {history && (
                   <Typography variant="body1" sx={{ mt: 2 }}>
-                    <strong>Latest Update:</strong> {new Date(history.pings[history.pings.length - 1].timestamp).toLocaleTimeString()}
+                    <strong>Latest Update:</strong> {
+                      history.pings && history.pings.length > 0 
+                      ? new Date(history.pings[history.pings.length - 1].timestamp).toLocaleTimeString()
+                      : history.check_in_time 
+                        ? new Date(`1970-01-01T${history.check_in_time}Z`).toLocaleTimeString() 
+                        : "Checked In"
+                    }
                   </Typography>
                 )}
               </Box>
@@ -118,9 +124,12 @@ export default function LiveTracking() {
               <Box display="flex" alignItems="center" justifyContent="center" height="100%">
                 <CircularProgress />
               </Box>
-            ) : history && history.pings && history.pings.length > 0 ? (
+            ) : history && (history.check_in_lat || (history.pings && history.pings.length > 0)) ? (
               <MapContainer 
-                center={[history.pings[0].latitude, history.pings[0].longitude]} 
+                center={[
+                  history.pings && history.pings.length > 0 ? history.pings[0].latitude : history.check_in_lat, 
+                  history.pings && history.pings.length > 0 ? history.pings[0].longitude : history.check_in_lng
+                ]} 
                 zoom={14} 
                 style={{ height: '100%', width: '100%' }}
               >
@@ -129,20 +138,32 @@ export default function LiveTracking() {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
                 
-                {selectedEmp?.work_category === 'OFFICE' && history.pings.length > 0 && (
+                {selectedEmp?.work_category === 'OFFICE' && history.check_in_lat && (
                   <Circle 
-                    center={[history.pings[0].latitude, history.pings[0].longitude]}
+                    center={[history.check_in_lat, history.check_in_lng]}
                     radius={100} // office radius config
                     pathOptions={{ color: 'blue', fillColor: 'blue', fillOpacity: 0.1 }}
                   />
                 )}
 
+                {history.check_in_lat && history.check_in_lng && (
+                  <Marker position={[history.check_in_lat, history.check_in_lng]}>
+                    <Popup>
+                      <strong>Check-In Location</strong><br/>
+                      Time: {new Date(`1970-01-01T${history.check_in_time}Z`).toLocaleTimeString()}
+                    </Popup>
+                  </Marker>
+                )}
+
                 <Polyline 
-                  positions={history.pings.map(p => [p.latitude, p.longitude])} 
+                  positions={[
+                    ...(history.check_in_lat ? [[history.check_in_lat, history.check_in_lng]] : []),
+                    ...(history.pings ? history.pings.map(p => [p.latitude, p.longitude]) : [])
+                  ]} 
                   color="red"
                 />
 
-                {history.pings.map((ping, idx) => (
+                {history.pings && history.pings.map((ping, idx) => (
                   <Marker key={idx} position={[ping.latitude, ping.longitude]}>
                     <Popup>
                       Time: {new Date(ping.timestamp).toLocaleTimeString()} <br/>

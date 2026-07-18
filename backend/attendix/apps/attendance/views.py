@@ -137,9 +137,17 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 'is_stop': p.is_stop
             })
             
+        active_session = attendance.sessions.last()
+            
         return Response({
             'attendance_id': attendance.id,
             'date': date_str,
+            'check_in_lat': active_session.check_in_lat if active_session else attendance.check_in_lat,
+            'check_in_lng': active_session.check_in_lng if active_session else attendance.check_in_lng,
+            'check_in_time': active_session.check_in_time if active_session else attendance.check_in_time,
+            'check_out_lat': active_session.check_out_lat if active_session else attendance.check_out_lat,
+            'check_out_lng': active_session.check_out_lng if active_session else attendance.check_out_lng,
+            'check_out_time': active_session.check_out_time if active_session else attendance.check_out_time,
             'pings': data
         }, status=status.HTTP_200_OK)
 
