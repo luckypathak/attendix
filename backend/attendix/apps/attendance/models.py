@@ -303,12 +303,22 @@ class AttendanceCorrectionRequest(SoftDeleteModel):
         related_name='attendance_corrections'
     )
     date = models.DateField()
+    session = models.ForeignKey(
+        'AttendanceSession',
+        on_delete=models.CASCADE,
+        related_name='correction_requests',
+        null=True,
+        blank=True
+    )
     request_type = models.CharField(
-        max_length=20,
+        max_length=40,
         choices=[
             ('MISSED_IN', 'Missed Check In'),
             ('MISSED_OUT', 'Missed Check Out'),
-            ('MISSED_BOTH', 'Missed Both Check In & Check Out')
+            ('MISSED_BOTH', 'Missed Both Check In & Check Out'),
+            ('CONTINUE_SHIFT', 'Continue Shift Approval'),
+            ('OT_APPROVAL', 'Overtime Approval'),
+            ('LATE_CHECKIN_WHILE_ACTIVE', 'Check In After Shift Ended'),
         ]
     )
     reason = models.TextField()

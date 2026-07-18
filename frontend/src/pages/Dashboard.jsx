@@ -44,6 +44,7 @@ export default function Dashboard() {
     remainingLeaves: '0 Days Left',
   });
 
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [autoCheckoutModalOpen, setAutoCheckoutModalOpen] = useState(false);
   const [attendanceData, setAttendanceData] = useState([]);
@@ -66,6 +67,8 @@ export default function Dashboard() {
         if (statsRes.data.trends) {
           setAttendanceData(statsRes.data.trends);
         }
+        const corrRes = await api.get('/attendance/correction/', { params: { status: 'PENDING' } });
+        setPendingRequests(corrRes.data.results || corrRes.data);
       } else {
         setEmployeeDashboard({
           status: statsData?.attendance?.status || 'Pending',
@@ -79,6 +82,16 @@ export default function Dashboard() {
       console.error("Dashboard fetch error:", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCorrectionAction = async (id, action) => {
+    try {
+      await api.post(`/attendance/correction/${id}/${action}/`);
+      fetchDashboardData(false);
+    } catch (error) {
+      console.error(`Error ${action} request:`, error);
+      alert(`Failed to ${action} request.`);
     }
   };
 
@@ -171,6 +184,53 @@ export default function Dashboard() {
                 </Card>
               </Grid>
             </Grid>
+          </Grid>
+
+          {/* Action Required: Pending Requests */}
+          <Grid item xs={12}>
+            <Card sx={{ borderLeft: '4px solid #f39c12' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <AlertTriangle size={20} color="#f39c12" />
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Action Required</Typography>
+                </Box>
+                {pendingRequests.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">No pending requests at the moment.</Typography>
+                ) : (
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.05)' }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Employee</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Reason</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
+                          <TableCell sx={{ fontWeight: 700, align: 'right' }}>Action</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {pendingRequests.map((req) => (
+                          <TableRow key={req.id} hover>
+                            <TableCell sx={{ fontWeight: 600 }}>{req.employee_name}</TableCell>
+                            <TableCell>
+                              <Chip size="small" label={req.request_type.replace(/_/g, ' ')} color="warning" variant="outlined" />
+                            </TableCell>
+                            <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {req.reason}
+                            </TableCell>
+                            <TableCell>{req.date}</TableCell>
+                            <TableCell align="right">
+                              <Button size="small" variant="contained" color="success" sx={{ mr: 1 }} onClick={() => handleCorrectionAction(req.id, 'approve')}>Approve</Button>
+                              <Button size="small" variant="outlined" color="error" onClick={() => handleCorrectionAction(req.id, 'reject')}>Reject</Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </CardContent>
+            </Card>
           </Grid>
 
           {/* Top Auto Checkout Employees */}

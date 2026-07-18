@@ -516,6 +516,10 @@ export default function Attendance() {
       if (e.response && e.response.status === 409 && e.response.data?.requires_ot_approval) {
         setOtPromptMessage(e.response.data.message);
         setOtPromptModal(true);
+      } else if (e.response && e.response.status === 409 && (e.response.data?.code === 'correction_request_submitted' || e.response.data?.detail?.includes('correction request'))) {
+        alert(e.response.data?.detail || "You attempted to check in again after your shift ended. A correction request has been sent to the Admin.");
+        setGpsData(null);
+        setCameraOpen(false);
       } else {
         setGpsError(getError(e, "Failed to check in."));
       }
@@ -1309,26 +1313,49 @@ export default function Attendance() {
             </Typography>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
+        <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
           <Button onClick={() => setOtPromptModal(false)} color="inherit">
             Cancel
           </Button>
-          <Button
-            onClick={async () => {
-              try {
-                await api.post('/attendance/overtime/request-ot/', { reason: 'Requested OT after shift end' });
-                setOtPromptModal(false);
-                fetchOvertimeRequests();
-                fetchCurrentState();
-              } catch (e) {
-                alert(getError(e, "Failed to request OT"));
-              }
-            }}
-            variant="contained"
-            color="primary"
-          >
-            Request OT
-          </Button>
+          <Box>
+            <Button
+              variant="outlined"
+              color="primary"
+              sx={{ mr: 1 }}
+              onClick={async () => {
+                try {
+                  await api.post('/attendance/correction/', {
+                    request_type: 'CONTINUE_SHIFT',
+                    reason: 'Requested to continue shift after shift end'
+                  });
+                  setOtPromptModal(false);
+                  alert('Continue Shift request sent to Admin.');
+                  fetchCurrentState();
+                } catch (e) {
+                  alert(getError(e, "Failed to request Continue Shift"));
+                }
+              }}
+            >
+              Continue Shift
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={async () => {
+                try {
+                  await api.post('/attendance/overtime/request-ot/', { reason: 'Requested OT after shift end' });
+                  setOtPromptModal(false);
+                  alert('Overtime request sent to Admin.');
+                  fetchOvertimeRequests();
+                  fetchCurrentState();
+                } catch (e) {
+                  alert(getError(e, "Failed to request OT"));
+                }
+              }}
+            >
+              Request OT
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
       

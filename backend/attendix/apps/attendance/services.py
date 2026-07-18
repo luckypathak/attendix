@@ -132,6 +132,35 @@ class AttendanceService:
         ).first()
 
         if active_session:
+            if shift:
+                # now_dt and shift_end_dt are already calculated above if shift exists
+                now_dt_check = timezone.make_aware(datetime.datetime.combine(today, time_now))
+                shift_end_dt_check = timezone.make_aware(datetime.datetime.combine(today, shift.end_time))
+                if shift.end_time < shift.start_time:
+                    shift_end_dt_check += datetime.timedelta(days=1)
+                
+                if now_dt_check > shift_end_dt_check:
+                    from attendix.apps.attendance.models import AttendanceCorrectionRequest
+                    # Do not create duplicate if one is already pending
+                    pending = AttendanceCorrectionRequest.objects.filter(
+                        session=active_session, status='PENDING', request_type='LATE_CHECKIN_WHILE_ACTIVE'
+                    ).exists()
+                    if not pending:
+                        AttendanceCorrectionRequest.objects.create(
+                            employee=employee,
+                            session=active_session,
+                            date=today,
+                            request_type='LATE_CHECKIN_WHILE_ACTIVE',
+                            reason='Attempted Check In after shift end while previous session still active.',
+                            status='PENDING'
+                        )
+                    from rest_framework.exceptions import APIException
+                    class BlockedCheckInCorrection(APIException):
+                        status_code = 409
+                        default_detail = "You attempted to check in again after your shift ended, but your previous session is still active. A correction request has been sent to the Admin."
+                        default_code = 'correction_request_submitted'
+                    raise BlockedCheckInCorrection()
+
             raise ValidationError("You are already checked in. Please check-out first.")
 
         # Get or create the Attendance record for today
@@ -393,6 +422,7 @@ class AttendanceService:
         attendance.save()
 
     @classmethod
+    @classmethod
     def check_active_overtimes_and_autocheckout(cls):
         """
         Periodically checks active attendance sessions, detects shift completion window,
@@ -400,8 +430,9 @@ class AttendanceService:
         """
         from django.utils import timezone
         import datetime
-        from attendix.apps.attendance.models import Overtime
+        from attendix.apps.attendance.models import Overtime, AttendanceCorrectionRequest
         from attendix.apps.notifications.services import NotificationService
+        from authentication.models import User
 
         tz = timezone.get_current_timezone()
         now_dt = timezone.localtime(timezone.now())
@@ -427,55 +458,92 @@ class AttendanceService:
             # Make shift_end_dt aware in local timezone
             shift_end_dt = timezone.make_aware(shift_end_dt, tz)
 
-            # Define window: 15 minutes before shift end to 15 minutes after shift end
-            window_start = shift_end_dt - datetime.timedelta(minutes=15)
-            window_end = shift_end_dt + datetime.timedelta(minutes=15)
+            # Define window: 15 minutes after shift end
+            trigger_dt = shift_end_dt + datetime.timedelta(minutes=15)
 
-            # 1. If we are past the window end, and the employee took no action (forgot checkout)
-            if now_dt > window_end:
-                if not session.continue_shift and not session.ot_requested:
-                    # Auto checkout due to negligence
-                    profile = getattr(employee, 'employee_profile', None)
-                    missed_count = 1
-                    if profile:
-                        from django.db.models import F
-                        profile.checkout_missed_count = F('checkout_missed_count') + 1
-                        profile.save(update_fields=['checkout_missed_count'])
-                        profile.refresh_from_db()
-                        missed_count = profile.checkout_missed_count
+            if now_dt >= trigger_dt:
+                # If session is already explicitly continued or OT approved, skip
+                if session.continue_shift or session.ot_status == 'APPROVED':
+                    continue
 
-                    # Use the actual time the auto checkout job runs, rather than backdating to window_end
-                    session.check_out_time = now_dt.time()
-                    session.auto_checkout = True
-                    session.checkout_reason = 'AUTO_CHECKOUT'
-                    session.checkout_missed_count = missed_count
-                    session.save()
+                # STEP 1: Check for existing pending request
+                pending_request = AttendanceCorrectionRequest.objects.filter(
+                    session=session,
+                    status='PENDING',
+                    request_type__in=['CONTINUE_SHIFT', 'OT_APPROVAL']
+                ).first()
 
-                    attendance.check_out_time = session.check_out_time
-                    attendance.save()
+                if not pending_request:
+                    # STEP 2: Create request if none exists
+                    reason = f"System generated request for {employee.username} as shift ended and session is still active."
+                    pending_request = AttendanceCorrectionRequest.objects.create(
+                        employee=employee,
+                        session=session,
+                        date=attendance.date,
+                        request_type='CONTINUE_SHIFT',
+                        reason=reason,
+                        status='PENDING'
+                    )
 
                     # Notify admins
                     admins = User.objects.filter(company=employee.company, role__in=['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'])
+                    profile = getattr(employee, 'employee_profile', None)
                     if profile and profile.manager:
                         admins = admins | User.objects.filter(id=profile.manager.id)
-                    admins = admins.distinct()
-
-                    for admin in admins:
+                    
+                    for admin in admins.distinct():
                         NotificationService.create_in_app_notification(
                             recipient=admin,
-                            title="Employee Auto Checked Out",
-                            body=f"Employee {employee.username} did not check out before shift end. System performed automatic checkout."
+                            title="Shift Ended - Action Required",
+                            body=f"Employee {employee.username}'s shift has ended but they are still checked in. Please approve or reject their session continuation."
                         )
+                else:
+                    # STEP 3/5: Wait timeout (15 mins from request creation)
+                    request_age_mins = (now_dt - pending_request.created_at).total_seconds() / 60
+                    if request_age_mins >= 15:
+                        # Auto checkout due to admin negligence/timeout
+                        pending_request.status = 'REJECTED'
+                        pending_request.rejected_reason = 'AUTO REJECTED (Timeout)'
+                        pending_request.save()
 
-                        if missed_count >= 3:
-                            NotificationService.create_in_app_notification(
-                                recipient=admin,
-                                title="Repeated Checkout Violation",
-                                body=f"Employee {employee.username} has failed to check out properly three times. Attendance marked as HALF_DAY."
-                            )
+                        cls._perform_auto_checkout(session, employee, attendance, now_dt, shift)
 
-                    # Recalculate metrics
-                    cls._recalculate_attendance_metrics(attendance, shift, attendance.date)
+    @classmethod
+    def _perform_auto_checkout(cls, session, employee, attendance, checkout_dt, shift):
+        from django.db.models import F
+        from attendix.apps.notifications.services import NotificationService
+        from authentication.models import User
+
+        profile = getattr(employee, 'employee_profile', None)
+        missed_count = 1
+        if profile:
+            profile.checkout_missed_count = F('checkout_missed_count') + 1
+            profile.save(update_fields=['checkout_missed_count'])
+            profile.refresh_from_db()
+            missed_count = profile.checkout_missed_count
+
+        session.check_out_time = checkout_dt.time()
+        session.auto_checkout = True
+        session.checkout_reason = 'AUTO_CHECKOUT'
+        session.checkout_missed_count = missed_count
+        session.save()
+
+        attendance.check_out_time = session.check_out_time
+        attendance.save()
+
+        admins = User.objects.filter(company=employee.company, role__in=['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'])
+        if profile and profile.manager:
+            admins = admins | User.objects.filter(id=profile.manager.id)
+        
+        for admin in admins.distinct():
+            NotificationService.create_in_app_notification(
+                recipient=admin,
+                title="Employee Auto Checked Out",
+                body=f"Employee {employee.username} was auto checked out (No admin response)."
+            )
+
+        # Recalculate metrics
+        cls._recalculate_attendance_metrics(attendance, shift, attendance.date)
 
     @classmethod
     def process_auto_checkout(cls):
@@ -537,6 +605,43 @@ class AttendanceService:
                 check_out_photo=correction.check_out_photo,
             )
             
+        elif correction.request_type == 'CONTINUE_SHIFT':
+            if correction.session:
+                correction.session.continue_shift = True
+                correction.session.save()
+                
+        elif correction.request_type == 'OT_APPROVAL':
+            if correction.session:
+                correction.session.ot_status = 'APPROVED'
+                correction.session.ot_request_created = True
+                correction.session.save()
+                from attendix.apps.attendance.models import Overtime
+                Overtime.objects.update_or_create(
+                    employee=attendance.employee,
+                    attendance=attendance,
+                    session=correction.session,
+                    date=attendance.date,
+                    defaults={
+                        'hours': 2.0, # Admin can adjust later
+                        'status': 'APPROVED',
+                        'approved_by': approved_by
+                    }
+                )
+                
+        elif correction.request_type == 'LATE_CHECKIN_WHILE_ACTIVE':
+            # Admin approved second checkin. We should checkout the previous session and create a new one
+            if correction.session and correction.session.check_out_time is None:
+                shift = attendance.shift or cls.get_active_shift(attendance.employee)
+                cls._perform_auto_checkout(correction.session, attendance.employee, attendance, now, shift)
+            # Now create a new session
+            AttendanceSession.objects.create(
+                attendance=attendance,
+                check_in_time=now.time(),
+                check_in_address="Approved late checkin",
+                check_in_lat=0,
+                check_in_lng=0
+            )
+
         # Recalculate metrics
-        shift = cls.get_active_shift(correction.employee)
+        shift = attendance.shift or cls.get_active_shift(attendance.employee)
         cls._recalculate_attendance_metrics(attendance, shift, correction.date)
