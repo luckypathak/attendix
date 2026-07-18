@@ -90,7 +90,6 @@ export default function Attendance() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [groupedRecords, setGroupedRecords] = useState({});
   const [expandedDates, setExpandedDates] = useState({});
   const [expandedEmployees, setExpandedEmployees] = useState({});
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
@@ -107,29 +106,29 @@ export default function Attendance() {
     }
   }, []);
 
-  const groupRecords = (records, currentFilters = filters) => {
-    if (currentFilters.employee) {
+  const groupedRecords = React.useMemo(() => {
+    if (filters.employee) {
       // Group by Employee Name -> Date
       const grouped = {};
-      records.forEach(rec => {
+      adminRecords.forEach(rec => {
         const emp = rec.employee_name;
         if (!grouped[emp]) grouped[emp] = {};
         const d = rec.date;
         if (!grouped[emp][d]) grouped[emp][d] = [];
         grouped[emp][d].push(rec);
       });
-      setGroupedRecords(grouped);
+      return grouped;
     } else {
       // Group by Date -> Employee
       const grouped = {};
-      records.forEach(rec => {
+      adminRecords.forEach(rec => {
         const d = rec.date;
         if (!grouped[d]) grouped[d] = [];
         grouped[d].push(rec);
       });
-      setGroupedRecords(grouped);
+      return grouped;
     }
-  };
+  }, [adminRecords, filters.employee]);
 
   const toggleDate = (date) => setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }));
   const toggleEmployee = (date, empId) => {
@@ -236,7 +235,6 @@ export default function Attendance() {
       const results = response.data.results || response.data;
       setAdminRecords(results);
       setTotalRecords(response.data.count || results.length);
-      groupRecords(results);
     } catch (e) {
       console.error(e);
     } finally {
