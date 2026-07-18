@@ -449,48 +449,56 @@ export default function Employees() {
                       <TableCell sx={{ fontWeight: 600 }}>{emp.username}</TableCell>
                       <TableCell>{emp.first_name || '--'} {emp.last_name || ''}</TableCell>
                       <TableCell>
-                        {emp.firm_allocations && emp.firm_allocations.length > 0 ? (
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                            {emp.firm_allocations.map(alloc => (
-                              <Chip 
-                                key={alloc.id}
-                                label={alloc.firm_name || 'No Branch'} 
-                                size="small"
-                                variant="outlined" 
-                                color="primary"
-                                sx={{ 
-                                  fontWeight: 600, 
-                                  fontSize: '0.7rem',
-                                  width: 'fit-content'
-                                }} 
-                              />
-                            ))}
-                          </Box>
-                        ) : (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           <Chip 
                             label={emp.firm_name || 'No Branch'} 
                             size="small" 
                             variant="outlined"
                             color={emp.firm_name ? "primary" : "default"}
-                            sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                            sx={{ fontWeight: 600, fontSize: '0.7rem', width: 'fit-content' }}
                           />
-                        )}
+                          {emp.firm_allocations && emp.firm_allocations.map(alloc => (
+                            <Chip 
+                              key={alloc.id}
+                              label={alloc.firm_name || 'No Branch'} 
+                              size="small"
+                              variant="outlined" 
+                              color="secondary"
+                              sx={{ 
+                                fontWeight: 600, 
+                                fontSize: '0.7rem',
+                                width: 'fit-content'
+                              }} 
+                            />
+                          ))}
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Chip 
-                          label={emp.shift_name ? `${emp.shift_name} (${emp.shift_start_time} - ${emp.shift_end_time})` : 'Standard (8h)'} 
+                          label={emp.shift_name || 'Standard (8h)'} 
                           size="small"
                           icon={<Clock size={12} />}
                           sx={{ fontWeight: 600, fontSize: '0.7rem' }} 
                         />
                       </TableCell>
                       <TableCell>
-                        <Chip 
-                          label={emp.pf_deduction ? "12% PF Enabled" : "No PF"} 
-                          size="small" 
-                          color={emp.pf_deduction ? "success" : "default"}
-                          sx={{ fontWeight: 600, fontSize: '0.7rem' }}
-                        />
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Chip 
+                            label={emp.pf_deduction ? "12% PF Enabled" : "No PF"} 
+                            size="small" 
+                            color={emp.pf_deduction ? "success" : "default"}
+                            sx={{ fontWeight: 600, fontSize: '0.7rem', width: 'fit-content' }}
+                          />
+                          {emp.firm_allocations && emp.firm_allocations.map(alloc => (
+                            <Chip 
+                              key={alloc.id}
+                              label={alloc.pf_type === 'disabled' ? "No PF" : alloc.pf_type === 'flat' ? `₹${alloc.pf_value} PF` : `${alloc.pf_value}% PF`} 
+                              size="small" 
+                              color={alloc.pf_type !== 'disabled' ? "success" : "default"}
+                              sx={{ fontWeight: 600, fontSize: '0.7rem', width: 'fit-content' }}
+                            />
+                          ))}
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Chip 
@@ -510,8 +518,28 @@ export default function Employees() {
                           />
                         </TableCell>
                       )}
-                      {isAdmin && <TableCell sx={{ fontWeight: 600 }}>₹{parseFloat(emp.base_salary).toLocaleString('en-IN')}</TableCell>}
-                      {isAdmin && <TableCell>₹{parseFloat(emp.hourly_rate).toFixed(2)}/hr</TableCell>}
+                      {isAdmin && (
+                        <TableCell sx={{ fontWeight: 600 }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>₹{parseFloat(emp.base_salary || 0).toLocaleString('en-IN')}</Typography>
+                            {emp.firm_allocations && emp.firm_allocations.map(alloc => (
+                              <Typography key={alloc.id} variant="body2" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>₹{parseFloat(alloc.base_salary || 0).toLocaleString('en-IN')}</Typography>
+                            ))}
+                          </Box>
+                        </TableCell>
+                      )}
+                      {isAdmin && (
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>₹{parseFloat(emp.hourly_rate || 0).toFixed(2)}/hr</Typography>
+                            {emp.firm_allocations && emp.firm_allocations.map(alloc => {
+                               // Approximate hourly rate for allocations just to show visually if needed
+                               const hourly = parseFloat(alloc.base_salary || 0) / 30 / 8;
+                               return <Typography key={alloc.id} variant="body2" color="text.secondary" sx={{ fontSize: '0.7rem' }}>₹{hourly.toFixed(2)}/hr</Typography>;
+                            })}
+                          </Box>
+                        </TableCell>
+                      )}
                       {hasEditRights && (
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -829,7 +857,7 @@ export default function Employees() {
                 })}
 
                 {(() => {
-                  const unassignedFirms = firms.filter(f => !allocations.some(a => a.firm === f.id));
+                  const unassignedFirms = firms.filter(f => !allocations.some(a => a.firm === f.id) && f.id !== firmId);
                   if (unassignedFirms.length === 0) {
                     return (
                       <Typography variant="body2" color="success.main" sx={{ mt: 2, fontWeight: 600 }}>
