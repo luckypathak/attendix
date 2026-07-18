@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { 
   Box, Card, CardContent, Grid, Button, Typography, 
   CircularProgress, Alert, Table, TableBody, TableCell, 
@@ -63,9 +63,30 @@ export default function Attendance() {
   const [history, setHistory] = useState([]);
   const [adminRecords, setAdminRecords] = useState([]);
   // --- FILTERS & PAGINATION ---
-  const [filters, setFilters] = useState({
-    date: '', startDate: '', endDate: '', employee: '', status: '', autoCheckout: '', overtimePending: ''
-  });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filters = {
+    date: searchParams.get('date') ?? '',
+    startDate: searchParams.get('startDate') ?? '',
+    endDate: searchParams.get('endDate') ?? '',
+    employee: searchParams.get('employee') ?? '',
+    status: searchParams.get('status') ?? '',
+    autoCheckout: searchParams.get('autoCheckout') ?? '',
+    overtimePending: searchParams.get('overtimePending') ?? ''
+  };
+
+  const setFilters = (newFilters) => {
+    const nextParams = new URLSearchParams(searchParams);
+    const updatedFilters = typeof newFilters === 'function' ? newFilters(filters) : { ...filters, ...newFilters };
+    Object.entries(updatedFilters).forEach(([key, value]) => {
+      if (value === '' || value === null || value === undefined) {
+        nextParams.delete(key);
+      } else {
+        nextParams.set(key, value);
+      }
+    });
+    setSearchParams(nextParams, { replace: true });
+  };
+
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -76,14 +97,38 @@ export default function Attendance() {
   const [viewPhotoUrl, setViewPhotoUrl] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
 
-  const groupRecords = (records) => {
-    const grouped = {};
-    records.forEach(rec => {
-      const d = rec.date;
-      if (!grouped[d]) grouped[d] = [];
-      grouped[d].push(rec);
-    });
-    setGroupedRecords(grouped);
+  useEffect(() => {
+    // Default state: if no date is in URL and no other filters exist, set to today
+    if (!searchParams.get('date') && !searchParams.get('employee')) {
+      const today = new Date().toISOString().split('T')[0];
+      const params = new URLSearchParams(searchParams);
+      params.set('date', today);
+      setSearchParams(params, { replace: true });
+    }
+  }, []);
+
+  const groupRecords = (records, currentFilters = filters) => {
+    if (currentFilters.employee) {
+      // Group by Employee Name -> Date
+      const grouped = {};
+      records.forEach(rec => {
+        const emp = rec.employee_name;
+        if (!grouped[emp]) grouped[emp] = {};
+        const d = rec.date;
+        if (!grouped[emp][d]) grouped[emp][d] = [];
+        grouped[emp][d].push(rec);
+      });
+      setGroupedRecords(grouped);
+    } else {
+      // Group by Date -> Employee
+      const grouped = {};
+      records.forEach(rec => {
+        const d = rec.date;
+        if (!grouped[d]) grouped[d] = [];
+        grouped[d].push(rec);
+      });
+      setGroupedRecords(grouped);
+    }
   };
 
   const toggleDate = (date) => setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }));
@@ -153,7 +198,7 @@ export default function Attendance() {
       if (isAdmin) fetchAdminRecords();
     }, 5000);
     return () => clearInterval(interval);
-  }, [isAdmin, selectedFirm, page, filters]);
+  }, [isAdmin, selectedFirm, page, searchParams]);
 
   const fetchHistory = async () => {
     try {
@@ -206,6 +251,69 @@ export default function Attendance() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const renderSessions = (empRec) => {
+    if (!empRec.sessions || empRec.sessions.length === 0) {
+      return <Typography variant="caption" color="text.secondary">No sessions recorded.</Typography>;
+    }
+    return empRec.sessions.map((sess, idx) => (
+      <Box key={sess.id} sx={{ p: 1.5, mb: 1, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          {/* Session Core Info */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 120 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>Session {idx + 1}</Typography>
+            <Typography variant="body2"><strong>In:</strong> {sess.check_in_time || '--'}</Typography>
+            <Typography variant="body2"><strong>Out:</strong> {sess.check_out_time || 'Active'}</Typography>
+            <Typography variant="caption" color="primary.main">Duration: {sess.working_hours || '--'}</Typography>
+          </Box>
+          {/* Photos */}
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Check In</Typography>
+              <Box sx={{ mt: 0.5 }}>
+                {sess.captured_image ? (
+                  <img src={getMediaUrl(sess.captured_image)} alt="Check In" onClick={() => setPreviewImage(getMediaUrl(sess.captured_image))} style={{ width: 40, height: 40, borderRadius: 4, cursor: 'pointer', objectFit: 'cover' }} />
+                ) : '--'}
+              </Box>
+            </Box>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Check Out</Typography>
+              <Box sx={{ mt: 0.5 }}>
+                {sess.check_out_captured_image ? (
+                  <img src={getMediaUrl(sess.check_out_captured_image)} alt="Check Out" onClick={() => setPreviewImage(getMediaUrl(sess.check_out_captured_image))} style={{ width: 40, height: 40, borderRadius: 4, cursor: 'pointer', objectFit: 'cover' }} />
+                ) : '--'}
+              </Box>
+            </Box>
+          </Box>
+          {/* Location */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, maxWidth: 200 }}>
+            {sess.check_in_address && (
+              <Tooltip title={sess.check_in_address} placement="top">
+                <Typography variant="caption" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📍 <strong>In:</strong> {sess.check_in_address}</Typography>
+              </Tooltip>
+            )}
+            {sess.check_out_address && (
+              <Tooltip title={sess.check_out_address} placement="bottom">
+                <Typography variant="caption" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📍 <strong>Out:</strong> {sess.check_out_address}</Typography>
+              </Tooltip>
+            )}
+            {sess.checkout_reason === 'AUTO_CHECKOUT' && (
+              <Chip size="small" color="error" label="Auto Checkout" sx={{ mt: 0.5 }} />
+            )}
+          </Box>
+          {/* Actions */}
+          <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+            <Button size="small" variant="outlined" onClick={() => {
+              const sessWithParentStatus = { ...sess, parent_status: empRec.status, employee_name: empRec.employee_name };
+              setSelectedSessionForEdit(sessWithParentStatus);
+              setEditModalOpen(true);
+            }}>Edit</Button>
+            <Button size="small" color="error" variant="outlined" onClick={() => handleDeleteSession(sess.id)}>Delete</Button>
+          </Box>
+        </Box>
+      </Box>
+    ));
   };
 
   const handleOpenOtModal = (rec) => {
@@ -707,133 +815,124 @@ export default function Attendance() {
                   {Object.keys(groupedRecords).length === 0 ? (
                     <Typography color="text.secondary">No attendance logs available.</Typography>
                   ) : (
-                    Object.keys(groupedRecords).sort((a, b) => new Date(b) - new Date(a)).map(dateStr => {
-                      const dayRecords = groupedRecords[dateStr];
-                      const presentCount = dayRecords.filter(r => r.status === 'PRESENT').length;
-                      const lateCount = dayRecords.filter(r => r.status === 'LATE').length;
-                      const halfDayCount = dayRecords.filter(r => r.status === 'HALF_DAY').length;
-                      const absentCount = dayRecords.filter(r => r.status === 'ABSENT').length;
-                      const isDateExpanded = expandedDates[dateStr];
-
-                      return (
-                        <Accordion 
-                          key={dateStr} 
-                          expanded={!!isDateExpanded} 
-                          onChange={() => toggleDate(dateStr)}
-                          sx={{ mb: 1, bgcolor: 'background.neutral', '&:before': { display: 'none' }, borderRadius: '8px !important' }}
-                        >
-                          <AccordionSummary expandIcon={<ChevronDown />}>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                              <Typography sx={{ fontWeight: 700, color: 'primary.main', mb: 1 }}>
-                                {formatDate(dateStr)} ({dayRecords.length} Employees)
+                    filters.employee ? (
+                      // EMPLOYEE SEARCH MODE (Employee -> Date -> Sessions)
+                      Object.keys(groupedRecords).sort().map(empName => {
+                        const empDates = groupedRecords[empName];
+                        const isEmpExpanded = expandedEmployees[empName];
+                        const allDates = Object.keys(empDates);
+                        
+                        return (
+                          <Accordion 
+                            key={empName} 
+                            expanded={isEmpExpanded !== false} // default expanded if searching
+                            onChange={() => toggleEmployee('ALL', empName)}
+                            sx={{ mb: 1, bgcolor: 'background.neutral', '&:before': { display: 'none' }, borderRadius: '8px !important' }}
+                          >
+                            <AccordionSummary expandIcon={<ChevronDown />}>
+                              <Typography sx={{ fontWeight: 700, color: 'primary.main' }}>
+                                {empName} ({allDates.length} Days)
                               </Typography>
-                              {!isDateExpanded && (
-                                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                                  <Typography variant="caption">Present: {presentCount}</Typography>
-                                  <Typography variant="caption">Late: {lateCount}</Typography>
-                                  <Typography variant="caption">Half Day: {halfDayCount}</Typography>
-                                  <Typography variant="caption">Absent: {absentCount}</Typography>
-                                </Box>
-                              )}
-                            </Box>
-                          </AccordionSummary>
-                          <AccordionDetails sx={{ p: 0, bgcolor: 'background.default' }}>
-                            {isDateExpanded && dayRecords.map(empRec => {
-                              const empKey = `${dateStr}_${empRec.id}`;
-                              const isEmpExpanded = expandedEmployees[empKey];
-                              
-                              return (
-                                <Accordion 
-                                  key={empRec.id} 
-                                  expanded={!!isEmpExpanded}
-                                  onChange={() => toggleEmployee(dateStr, empRec.id)}
-                                  sx={{ m: 1, boxShadow: 'none', border: '1px solid rgba(255,255,255,0.05)', '&:before': { display: 'none' } }}
-                                >
-                                  <AccordionSummary expandIcon={<ChevronDown />}>
-                                    <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', width: '100%' }}>
-                                      <Typography sx={{ fontWeight: 600, minWidth: 150 }}>{empRec.employee_name}</Typography>
-                                      <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
-                                      <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
-                                      <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ ml: 'auto', fontSize: '0.7rem' }}>
-                                        Pre-Approve OT
-                                      </Button>
-                                    </Box>
-                                  </AccordionSummary>
-                                  <AccordionDetails sx={{ p: 2, pt: 0 }}>
-                                    {isEmpExpanded && empRec.sessions && empRec.sessions.length > 0 ? (
-                                      empRec.sessions.map((sess, idx) => (
-                                        <Box key={sess.id} sx={{ p: 1.5, mb: 1, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                                          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-                                            
-                                            {/* Session Core Info */}
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 120 }}>
-                                              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>Session {idx + 1}</Typography>
-                                              <Typography variant="body2"><strong>In:</strong> {sess.check_in_time || '--'}</Typography>
-                                              <Typography variant="body2"><strong>Out:</strong> {sess.check_out_time || 'Active'}</Typography>
-                                              <Typography variant="caption" color="primary.main">Duration: {sess.working_hours || '--'}</Typography>
-                                            </Box>
-                                            
-                                            {/* Photos */}
-                                            <Box sx={{ display: 'flex', gap: 2 }}>
-                                              <Box sx={{ textAlign: 'center' }}>
-                                                <Typography variant="caption" color="text.secondary">Check In</Typography>
-                                                <Box sx={{ mt: 0.5 }}>
-                                                  {sess.captured_image ? (
-                                                    <img src={getMediaUrl(sess.captured_image)} alt="Check In" onClick={() => setPreviewImage(getMediaUrl(sess.captured_image))} style={{ width: 40, height: 40, borderRadius: 4, cursor: 'pointer', objectFit: 'cover' }} />
-                                                  ) : '--'}
-                                                </Box>
-                                              </Box>
-                                              <Box sx={{ textAlign: 'center' }}>
-                                                <Typography variant="caption" color="text.secondary">Check Out</Typography>
-                                                <Box sx={{ mt: 0.5 }}>
-                                                  {sess.check_out_captured_image ? (
-                                                    <img src={getMediaUrl(sess.check_out_captured_image)} alt="Check Out" onClick={() => setPreviewImage(getMediaUrl(sess.check_out_captured_image))} style={{ width: 40, height: 40, borderRadius: 4, cursor: 'pointer', objectFit: 'cover' }} />
-                                                  ) : '--'}
-                                                </Box>
-                                              </Box>
-                                            </Box>
-                                            
-                                            {/* Location */}
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, maxWidth: 200 }}>
-                                              {sess.check_in_address && (
-                                                <Tooltip title={sess.check_in_address} placement="top">
-                                                  <Typography variant="caption" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📍 <strong>In:</strong> {sess.check_in_address}</Typography>
-                                                </Tooltip>
-                                              )}
-                                              {sess.check_out_address && (
-                                                <Tooltip title={sess.check_out_address} placement="bottom">
-                                                  <Typography variant="caption" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>📍 <strong>Out:</strong> {sess.check_out_address}</Typography>
-                                                </Tooltip>
-                                              )}
-                                              {sess.checkout_reason === 'AUTO_CHECKOUT' && (
-                                                <Chip size="small" color="error" label="Auto Checkout" sx={{ mt: 0.5 }} />
-                                              )}
-                                            </Box>
-                                            
-                                            {/* Actions */}
-                                            <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
-                                              <Button size="small" variant="outlined" onClick={() => {
-                                                const sessWithParentStatus = { ...sess, parent_status: empRec.status, employee_name: empRec.employee_name };
-                                                setSelectedSessionForEdit(sessWithParentStatus);
-                                                setEditModalOpen(true);
-                                              }}>Edit</Button>
-                                              <Button size="small" color="error" variant="outlined" onClick={() => handleDeleteSession(sess.id)}>Delete</Button>
-                                            </Box>
-                                            
-                                          </Box>
-                                        </Box>
-                                      ))
-                                    ) : (
-                                      <Typography variant="caption" color="text.secondary">No sessions recorded.</Typography>
-                                    )}
-                                  </AccordionDetails>
-                                </Accordion>
-                              );
-                            })}
-                          </AccordionDetails>
-                        </Accordion>
-                      );
-                    })
+                            </AccordionSummary>
+                            <AccordionDetails sx={{ p: 0, bgcolor: 'background.default' }}>
+                              {(isEmpExpanded !== false) && allDates.sort((a, b) => new Date(b) - new Date(a)).map(dateStr => {
+                                const empRecs = empDates[dateStr];
+                                const empRec = empRecs[0];
+                                const empKey = `${dateStr}_${empRec.id}`;
+                                const isDateExpanded = expandedDates[empKey];
+                                
+                                return (
+                                  <Accordion 
+                                    key={dateStr} 
+                                    expanded={!!isDateExpanded}
+                                    onChange={() => toggleDate(empKey)}
+                                    sx={{ m: 1, boxShadow: 'none', border: '1px solid rgba(255,255,255,0.05)', '&:before': { display: 'none' } }}
+                                  >
+                                    <AccordionSummary expandIcon={<ChevronDown />}>
+                                      <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', width: '100%' }}>
+                                        <Typography sx={{ fontWeight: 600, minWidth: 120 }}>{formatDate(dateStr)}</Typography>
+                                        <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
+                                        <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
+                                        <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ ml: 'auto', fontSize: '0.7rem' }}>
+                                          Pre-Approve OT
+                                        </Button>
+                                      </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails sx={{ p: 2, pt: 0 }}>
+                                      {renderSessions(empRec)}
+                                    </AccordionDetails>
+                                  </Accordion>
+                                );
+                              })}
+                            </AccordionDetails>
+                          </Accordion>
+                        );
+                      })
+                    ) : (
+                      // NORMAL MODE (Date -> Employee -> Sessions)
+                      Object.keys(groupedRecords).sort((a, b) => new Date(b) - new Date(a)).map(dateStr => {
+                        const dayRecords = groupedRecords[dateStr];
+                        const presentCount = dayRecords.filter(r => r.status === 'PRESENT').length;
+                        const lateCount = dayRecords.filter(r => r.status === 'LATE').length;
+                        const halfDayCount = dayRecords.filter(r => r.status === 'HALF_DAY').length;
+                        const absentCount = dayRecords.filter(r => r.status === 'ABSENT').length;
+                        const isDateExpanded = expandedDates[dateStr];
+
+                        return (
+                          <Accordion 
+                            key={dateStr} 
+                            expanded={!!isDateExpanded} 
+                            onChange={() => toggleDate(dateStr)}
+                            sx={{ mb: 1, bgcolor: 'background.neutral', '&:before': { display: 'none' }, borderRadius: '8px !important' }}
+                          >
+                            <AccordionSummary expandIcon={<ChevronDown />}>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                                <Typography sx={{ fontWeight: 700, color: 'primary.main', mb: 1 }}>
+                                  {formatDate(dateStr)} ({dayRecords.length} Employees)
+                                </Typography>
+                                {!isDateExpanded && (
+                                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                    <Typography variant="caption">Present: {presentCount}</Typography>
+                                    <Typography variant="caption">Late: {lateCount}</Typography>
+                                    <Typography variant="caption">Half Day: {halfDayCount}</Typography>
+                                    <Typography variant="caption">Absent: {absentCount}</Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                            </AccordionSummary>
+                            <AccordionDetails sx={{ p: 0, bgcolor: 'background.default' }}>
+                              {isDateExpanded && dayRecords.map(empRec => {
+                                const empKey = `${dateStr}_${empRec.id}`;
+                                const isEmpExpanded = expandedEmployees[empKey];
+                                
+                                return (
+                                  <Accordion 
+                                    key={empRec.id} 
+                                    expanded={!!isEmpExpanded}
+                                    onChange={() => toggleEmployee(dateStr, empRec.id)}
+                                    sx={{ m: 1, boxShadow: 'none', border: '1px solid rgba(255,255,255,0.05)', '&:before': { display: 'none' } }}
+                                  >
+                                    <AccordionSummary expandIcon={<ChevronDown />}>
+                                      <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', width: '100%' }}>
+                                        <Typography sx={{ fontWeight: 600, minWidth: 150 }}>{empRec.employee_name}</Typography>
+                                        <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
+                                        <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
+                                        <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ ml: 'auto', fontSize: '0.7rem' }}>
+                                          Pre-Approve OT
+                                        </Button>
+                                      </Box>
+                                    </AccordionSummary>
+                                    <AccordionDetails sx={{ p: 2, pt: 0 }}>
+                                      {isEmpExpanded && renderSessions(empRec)}
+                                    </AccordionDetails>
+                                  </Accordion>
+                                );
+                              })}
+                            </AccordionDetails>
+                          </Accordion>
+                        );
+                      })
+                    )
                   )}
                   
                   {totalRecords > pageSize && (

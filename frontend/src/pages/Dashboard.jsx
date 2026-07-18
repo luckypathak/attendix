@@ -13,6 +13,13 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../services/api';
 
+const getTodayString = () => new Date().toISOString().split('T')[0];
+const getYesterdayString = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+};
+
 export default function Dashboard() {
   const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
@@ -101,7 +108,7 @@ export default function Dashboard() {
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Attendance</Typography>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6} md={2}>
-                <Card onClick={() => navigate('/attendance')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(0, 245, 212, 0.05)' }}>
+                <Card onClick={() => navigate(`/attendance?date=${getTodayString()}&status=PRESENT`)} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(0, 245, 212, 0.05)' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Present</Typography>
                     <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>{stats?.attendance?.present ?? 0}</Typography>
@@ -109,7 +116,7 @@ export default function Dashboard() {
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={2}>
-                <Card onClick={() => navigate('/attendance')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(255, 159, 67, 0.05)' }}>
+                <Card onClick={() => navigate(`/attendance?date=${getTodayString()}&status=LATE`)} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(255, 159, 67, 0.05)' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Late</Typography>
                     <Typography variant="h5" sx={{ fontWeight: 800, color: 'warning.main' }}>{stats?.attendance?.late ?? 0}</Typography>
@@ -117,7 +124,7 @@ export default function Dashboard() {
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={2}>
-                <Card onClick={() => navigate('/attendance')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(231, 76, 60, 0.05)' }}>
+                <Card onClick={() => navigate(`/attendance?date=${getTodayString()}&status=ABSENT`)} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(231, 76, 60, 0.05)' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Absent</Typography>
                     <Typography variant="h5" sx={{ fontWeight: 800, color: 'error.main' }}>{stats?.attendance?.absent ?? 0}</Typography>
@@ -125,7 +132,7 @@ export default function Dashboard() {
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={2}>
-                <Card onClick={() => navigate('/attendance')} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(157, 78, 221, 0.05)' }}>
+                <Card onClick={() => navigate(`/attendance?date=${getTodayString()}&status=HALF_DAY`)} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', bgcolor: 'rgba(157, 78, 221, 0.05)' }}>
                   <CardContent>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Half Day</Typography>
                     <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>{stats?.attendance?.half_day ?? 0}</Typography>
@@ -135,22 +142,26 @@ export default function Dashboard() {
               
               {/* Auto Checkouts */}
               <Grid item xs={12} sm={12} md={4}>
-                <Card onClick={() => setAutoCheckoutModalOpen(true)} sx={{ cursor: 'pointer', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, transition: 'all 0.2s', background: 'linear-gradient(135deg, rgba(231, 76, 60, 0.05) 0%, rgba(255, 159, 67, 0.05) 100%)' }}>
+                <Card sx={{ transition: 'all 0.2s', background: 'linear-gradient(135deg, rgba(231, 76, 60, 0.05) 0%, rgba(255, 159, 67, 0.05) 100%)' }}>
                   <CardContent sx={{ display: 'flex', flexDirection: 'column' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                       <MonitorOff size={18} color="#e74c3c" />
                       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Auto Checkouts</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box>
+                      <Box onClick={() => navigate(`/attendance?date=${getTodayString()}&autoCheckout=YES`)} sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 } }}>
                         <Typography variant="h4" sx={{ fontWeight: 800, color: '#e74c3c' }}>{stats?.attendance?.auto_checkouts_today ?? 0}</Typography>
                         <Typography variant="caption" color="text.secondary">Today</Typography>
                       </Box>
-                      <Box sx={{ textAlign: 'center' }}>
+                      <Box onClick={() => navigate(`/attendance?date=${getYesterdayString()}&autoCheckout=YES`)} sx={{ cursor: 'pointer', textAlign: 'center', '&:hover': { opacity: 0.8 } }}>
                         <Typography variant="h5" sx={{ fontWeight: 800 }}>{stats?.attendance?.auto_checkouts_yesterday ?? 0}</Typography>
                         <Typography variant="caption" color="text.secondary">Yesterday</Typography>
                       </Box>
-                      <Box sx={{ textAlign: 'right' }}>
+                      <Box onClick={() => {
+                        const start = new Date(); start.setDate(1);
+                        const end = new Date(); end.setMonth(end.getMonth() + 1, 0);
+                        navigate(`/attendance?startDate=${start.toISOString().split('T')[0]}&endDate=${end.toISOString().split('T')[0]}&autoCheckout=YES`);
+                      }} sx={{ cursor: 'pointer', textAlign: 'right', '&:hover': { opacity: 0.8 } }}>
                         <Typography variant="h5" sx={{ fontWeight: 800 }}>{stats?.attendance?.auto_checkouts_month ?? 0}</Typography>
                         <Typography variant="caption" color="text.secondary">This Month</Typography>
                       </Box>
@@ -309,7 +320,7 @@ export default function Dashboard() {
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, mt: 2 }}>Approvals (Leave & Overtime)</Typography>
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6}>
-                <Card onClick={() => navigate('/leaves')} sx={{ cursor: 'pointer', border: '1px solid', borderColor: 'divider' }}>
+                <Card onClick={() => navigate(`/attendance?date=${getTodayString()}&status=LEAVE`)} sx={{ cursor: 'pointer', border: '1px solid', borderColor: 'divider' }}>
                   <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'rgba(255, 159, 67, 0.1)', color: 'warning.main' }}><Hourglass size={20} /></Box>
