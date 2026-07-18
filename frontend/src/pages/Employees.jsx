@@ -8,7 +8,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, MenuItem,
   Checkbox, FormControlLabel, Switch, IconButton, Divider
 } from '@mui/material';
-import { UserPlus, Shield, Landmark, Calendar, Mail, User, Clock, Settings, Trash2, ArrowRightLeft } from 'lucide-react';
+import { UserPlus, Shield, Landmark, Calendar, Mail, User, Clock, Settings, Trash2, ArrowRightLeft, CheckCircle } from 'lucide-react';
 import api from '../services/api';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
