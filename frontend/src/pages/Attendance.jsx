@@ -190,13 +190,7 @@ export default function Attendance() {
     fetchCurrentState();
     fetchOvertimeRequests();
     if (isAdmin) fetchAdminRecords();
-    const interval = setInterval(() => {
-      fetchHistory();
-      fetchCurrentState();
-      fetchOvertimeRequests();
-      if (isAdmin) fetchAdminRecords();
-    }, 5000);
-    return () => clearInterval(interval);
+    // Polling removed to prevent continuous API spam
   }, [isAdmin, selectedFirm, page, searchParams]);
 
   const fetchHistory = async () => {
