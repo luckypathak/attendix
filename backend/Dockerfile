@@ -17,4 +17,4 @@ COPY . /app/
 
 EXPOSE 8000
 
-CMD ["./start.sh"]
+CMD ["./start.sh", "web"]

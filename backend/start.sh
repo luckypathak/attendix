@@ -10,6 +10,9 @@ if [ "$COMMAND" = "build" ]; then
     python manage.py migrate
     python manage.py seed_celery_tasks
 elif [ "$COMMAND" = "web" ]; then
+    python manage.py collectstatic --no-input
+    python manage.py migrate
+    python manage.py seed_celery_tasks
     exec gunicorn attendix.wsgi:application --bind 0.0.0.0:8000
 elif [ "$COMMAND" = "worker" ]; then
     exec celery -A attendix worker --loglevel=info
