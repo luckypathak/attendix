@@ -432,7 +432,7 @@ class AttendanceService:
         import datetime
         from attendix.apps.attendance.models import Overtime, AttendanceCorrectionRequest
         from attendix.apps.notifications.services import NotificationService
-        from authentication.models import User
+        from attendix.apps.authentication.models import User
 
         tz = timezone.get_current_timezone()
         now_dt = timezone.localtime(timezone.now())
@@ -515,7 +515,7 @@ class AttendanceService:
     def _perform_auto_checkout(cls, session, employee, attendance, checkout_dt, shift):
         from django.db.models import F
         from attendix.apps.notifications.services import NotificationService
-        from authentication.models import User
+        from attendix.apps.authentication.models import User
 
         profile = getattr(employee, 'employee_profile', None)
         missed_count = 1
