@@ -120,6 +120,7 @@ export default function Attendance() {
     try {
       await api.delete('/attendance/records/delete-session/', { data: { session_id: sessionId } });
       fetchHistory();
+      fetchCurrentState();
       if (isAdmin) fetchAdminRecords();
     } catch (err) {
       alert("Failed to delete session.");
@@ -142,10 +143,12 @@ export default function Attendance() {
     fetchCompanySettings();
     
     fetchHistory();
+    fetchCurrentState();
     fetchOvertimeRequests();
     if (isAdmin) fetchAdminRecords();
     const interval = setInterval(() => {
       fetchHistory();
+      fetchCurrentState();
       fetchOvertimeRequests();
       if (isAdmin) fetchAdminRecords();
     }, 5000);
@@ -156,35 +159,23 @@ export default function Attendance() {
     try {
       const response = await api.get('/attendance/records/history/');
       setHistory(response.data);
-      
-      // Find if there is an active session
-      let activeRec = null;
-      let activeSess = null;
-      for (const rec of response.data) {
-        if (rec.sessions) {
-          const openSess = rec.sessions.find(sess => !sess.check_out_time);
-          if (openSess) {
-            activeRec = rec;
-            activeSess = openSess;
-            break;
-          }
-        }
-      }
-
-      if (activeRec && activeSess) {
-        setAttendanceToday(activeRec);
-        setActiveSession(activeSess);
-        setIsClockedIn(true);
-      } else {
-        // If no active session, find if there is a record for today to show in summary
-        const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
-        const todayRec = response.data.find(rec => rec.date === todayStr);
-        setAttendanceToday(todayRec || null);
-        setActiveSession(null);
-        setIsClockedIn(false);
-      }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const fetchCurrentState = async () => {
+    try {
+      const response = await api.get('/attendance/records/current/');
+      setIsClockedIn(response.data.is_clocked_in);
+      setAttendanceToday(response.data.attendance_record);
+      setActiveSession(response.data.active_session);
+    } catch (e) {
+      console.error(e);
+      // Fallback
+      setIsClockedIn(false);
+      setAttendanceToday(null);
+      setActiveSession(null);
     }
   };
 
@@ -409,6 +400,7 @@ export default function Attendance() {
       setGpsData(null);
       setAddress('');
       fetchHistory();
+      fetchCurrentState();
     } catch (e) {
       setGpsError(getError(e, "Failed to check in."));
     } finally {
@@ -441,6 +433,7 @@ export default function Attendance() {
       setGpsData(null);
       setAddress('');
       fetchHistory();
+      fetchCurrentState();
       fetchOvertimeRequests();
     } catch (e) {
       setGpsError(getError(e, "Failed to check out."));
@@ -580,6 +573,7 @@ export default function Attendance() {
                                 try {
                                   await api.post(`/attendance/records/${attendanceToday.id}/continue-shift/`);
                                   fetchHistory();
+                                  fetchCurrentState();
                                 } catch (e) {
                                   alert(getError(e, 'Failed to continue shift'));
                                 }
@@ -596,6 +590,7 @@ export default function Attendance() {
                                 try {
                                   await api.post(`/attendance/records/${attendanceToday.id}/request-overtime/`);
                                   fetchHistory();
+                                  fetchCurrentState();
                                   fetchOvertimeRequests();
                                 } catch (e) {
                                   alert(getError(e, 'Failed to request overtime'));
@@ -1143,6 +1138,7 @@ export default function Attendance() {
           session={selectedSessionForEdit}
           onSaved={() => {
             fetchHistory();
+            fetchCurrentState();
             if (isAdmin) fetchAdminRecords();
           }}
         />

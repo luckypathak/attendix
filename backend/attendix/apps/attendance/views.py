@@ -184,6 +184,30 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         ).order_by('-date')
         return Response(AttendanceSerializer(records, many=True, context={'request': request}).data)
 
+    @action(detail=False, methods=['get'], url_path='current')
+    def current(self, request):
+        from django.utils import timezone
+        today = timezone.localtime(timezone.now()).date()
+        attendance = Attendance.objects.filter(employee=request.user, date=today).first()
+        
+        is_clocked_in = False
+        active_session = None
+        
+        if attendance:
+            active_session_obj = attendance.sessions.filter(check_out_time__isnull=True).first()
+            if active_session_obj:
+                from .serializers import AttendanceSessionSerializer
+                is_clocked_in = True
+                active_session = AttendanceSessionSerializer(active_session_obj, context={'request': request}).data
+                
+        attendance_data = AttendanceSerializer(attendance, context={'request': request}).data if attendance else None
+        
+        return Response({
+            "is_clocked_in": is_clocked_in,
+            "attendance_record": attendance_data,
+            "active_session": active_session
+        })
+
     @action(detail=False, methods=['post'], url_path='ping')
     def ping(self, request):
         latitude = request.data.get('latitude')
