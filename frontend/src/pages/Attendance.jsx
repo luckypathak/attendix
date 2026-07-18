@@ -910,8 +910,14 @@ export default function Attendance() {
                                         <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
                                         <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
                                         <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
-                                          <Button size="small" variant="outlined" color="secondary" onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} sx={{ fontSize: '0.7rem' }}>
-                                            Pre-Continue
+                                          <Button 
+                                            size="small" 
+                                            variant={empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "contained" : "outlined"} 
+                                            color="secondary" 
+                                            onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} 
+                                            sx={{ fontSize: '0.7rem' }}
+                                          >
+                                            {empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "Pre-Continued" : "Pre-Continue"}
                                           </Button>
                                           <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
                                             Pre-Approve OT
@@ -979,8 +985,14 @@ export default function Attendance() {
                                         <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
                                         <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
                                         <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
-                                          <Button size="small" variant="outlined" color="secondary" onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} sx={{ fontSize: '0.7rem' }}>
-                                            Pre-Continue
+                                          <Button 
+                                            size="small" 
+                                            variant={empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "contained" : "outlined"} 
+                                            color="secondary" 
+                                            onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} 
+                                            sx={{ fontSize: '0.7rem' }}
+                                          >
+                                            {empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "Pre-Continued" : "Pre-Continue"}
                                           </Button>
                                           <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
                                             Pre-Approve OT
