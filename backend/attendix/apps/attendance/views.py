@@ -35,7 +35,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     serializer_class = AttendanceSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['employee', 'date', 'status']
+    filterset_fields = ['date', 'status']
 
     from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -43,6 +43,23 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         base_qs = self.queryset.filter(employee__is_deleted=False, employee__is_active=True)
+        
+        # Apply custom filters first
+        emp_name = self.request.query_params.get('employee')
+        if emp_name:
+            from django.db.models import Q
+            base_qs = base_qs.filter(
+                Q(employee__first_name__icontains=emp_name) | 
+                Q(employee__last_name__icontains=emp_name) | 
+                Q(employee__username__icontains=emp_name)
+            )
+        
+        auto_checkout = self.request.query_params.get('autoCheckout')
+        if auto_checkout == 'true':
+            base_qs = base_qs.filter(sessions__auto_checkout=True).distinct()
+        elif auto_checkout == 'false':
+            base_qs = base_qs.filter(sessions__auto_checkout=False).distinct()
+
         if user.role == 'SUPER_ADMIN':
             firm_id = self.request.query_params.get('firm')
             if firm_id and firm_id != 'ALL' and firm_id != 'undefined':

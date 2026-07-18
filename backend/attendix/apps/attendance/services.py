@@ -124,6 +124,11 @@ class AttendanceService:
             attendance.captured_image = captured_image
             attendance.status = status
             attendance.save()
+            if captured_image:
+                try:
+                    captured_image.seek(0)
+                except Exception:
+                    pass
         else:
             attendance.save()
 
