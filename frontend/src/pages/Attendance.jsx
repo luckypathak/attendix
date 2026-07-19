@@ -111,6 +111,7 @@ export default function Attendance() {
       const params = new URLSearchParams(searchParams);
       params.set('date', today);
       setSearchParams(params, { replace: true });
+      setFilters(prev => ({ ...prev, date: today }));
     }
   }, []);
 

@@ -87,6 +87,11 @@ def auto_absent_marker_task(self):
     now = timezone.localtime(timezone.now())
     today = now.date()
     
+    # Do not mark ABSENT on Sundays (weekday() == 6)
+    if today.weekday() == 6:
+        logger.info("Today is Sunday. Skipping auto absent marker.")
+        return "Skipped (Sunday)"
+    
     # Simple logic: users without attendance today, whose shift started > 30 mins ago
     from attendix.apps.employee.models import EmployeeProfile
     profiles = EmployeeProfile.objects.exclude(user__attendance_records__date=today).exclude(user__leaves__start_date__lte=today, user__leaves__end_date__gte=today, user__leaves__status='APPROVED').select_related('shift', 'user')
