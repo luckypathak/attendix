@@ -7,7 +7,7 @@ import {
   TableContainer, TableHead, TableRow, Paper, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Accordion, AccordionSummary, AccordionDetails, Tooltip,
-  IconButton, Pagination, Select, MenuItem, InputLabel, FormControl, Tabs, Tab
+  IconButton, Pagination, Select, MenuItem, InputLabel, FormControl, Tabs, Tab, Checkbox, FormControlLabel
 } from '@mui/material';
 import { MapPin, ShieldAlert, CheckCircle, Clock, ChevronDown, ChevronRight, X, Maximize2 } from 'lucide-react';
 import api, { getMediaUrl } from '../services/api';
@@ -152,6 +152,14 @@ export default function Attendance() {
   const [selectedRecordForOt, setSelectedRecordForOt] = useState(null);
   const [otHours, setOtHours] = useState('2.0');
 
+  const [addSessionModalOpen, setAddSessionModalOpen] = useState(false);
+  const [selectedRecordForSession, setSelectedRecordForSession] = useState(null);
+  const [manualCheckIn, setManualCheckIn] = useState('09:00');
+  const [manualCheckOut, setManualCheckOut] = useState('18:00');
+  const [manualAutoCheckout, setManualAutoCheckout] = useState(false);
+  const [manualSessionType, setManualSessionType] = useState('Regular');
+  const [manualReason, setManualReason] = useState('');
+
   // Camera states
   const [openCameraModal, setOpenCameraModal] = useState(false);
   const [cameraMode, setCameraMode] = useState('IN'); // 'IN' or 'OUT'
@@ -179,7 +187,8 @@ export default function Attendance() {
       fetchCurrentState();
       if (isAdmin) fetchAdminRecords();
     } catch (err) {
-      alert("Failed to delete session.");
+      console.error("Delete session error:", err);
+      alert("Failed to delete session. " + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -335,6 +344,34 @@ export default function Attendance() {
     setSelectedRecordForOt(rec);
     setOtHours('2.0');
     setOtModalOpen(true);
+  };
+
+  const handleOpenSessionModal = (empRec) => {
+    setSelectedRecordForSession(empRec);
+    setManualCheckIn('09:00');
+    setManualCheckOut('18:00');
+    setManualAutoCheckout(false);
+    setManualSessionType('Regular');
+    setManualReason('');
+    setAddSessionModalOpen(true);
+  };
+
+  const handleAddManualSession = async () => {
+    if (!selectedRecordForSession) return;
+    try {
+      await api.post(`/attendance/records/${selectedRecordForSession.id}/add-manual-session/`, {
+        check_in_time: manualCheckIn,
+        check_out_time: manualCheckOut,
+        auto_checkout: manualAutoCheckout,
+        session_type: manualSessionType,
+        reason: manualReason
+      });
+      alert('Manual session added successfully.');
+      setAddSessionModalOpen(false);
+      fetchAdminRecords();
+    } catch (e) {
+      alert("Failed to add session: " + (e.response?.data?.detail || e.message));
+    }
   };
 
   const handleSubmitPreApprovedOt = async () => {
@@ -913,18 +950,33 @@ export default function Attendance() {
                                         <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
                                         <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
                                         <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
-                                          <Button 
-                                            size="small" 
-                                            variant={empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "contained" : "outlined"} 
-                                            color="secondary" 
-                                            onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} 
-                                            sx={{ fontSize: '0.7rem' }}
-                                          >
-                                            {empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "Pre-Continued" : "Pre-Continue"}
-                                          </Button>
-                                          <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
-                                            Pre-Approve OT
-                                          </Button>
+                                          {empRec.status === 'ABSENT' ? (
+                                            <Button size="small" variant="contained" color="primary" onClick={(e) => { e.stopPropagation(); handleOpenSessionModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                              + Add Session
+                                            </Button>
+                                          ) : (
+                                            <>
+                                              {empRec.sessions?.length > 0 && (
+                                                <>
+                                                  <Button 
+                                                    size="small" 
+                                                    variant={empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "contained" : "outlined"} 
+                                                    color="secondary" 
+                                                    onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} 
+                                                    sx={{ fontSize: '0.7rem' }}
+                                                  >
+                                                    {empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "Pre-Continued" : "Pre-Continue"}
+                                                  </Button>
+                                                  <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                                    Pre-Approve OT
+                                                  </Button>
+                                                </>
+                                              )}
+                                              <Button size="small" variant="outlined" color="info" onClick={(e) => { e.stopPropagation(); handleOpenSessionModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                                Add Session
+                                              </Button>
+                                            </>
+                                          )}
                                         </Box>
                                       </Box>
                                     </AccordionSummary>
@@ -988,18 +1040,33 @@ export default function Attendance() {
                                         <Chip label={empRec.status} size="small" color={getStatusChipColor(empRec.status)} sx={{ fontWeight: 600, fontSize: '0.7rem' }} />
                                         <Typography variant="body2" color="text.secondary">Total: {empRec.formatted_worked_hours || '0h 0m'}</Typography>
                                         <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
-                                          <Button 
-                                            size="small" 
-                                            variant={empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "contained" : "outlined"} 
-                                            color="secondary" 
-                                            onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} 
-                                            sx={{ fontSize: '0.7rem' }}
-                                          >
-                                            {empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "Pre-Continued" : "Pre-Continue"}
-                                          </Button>
-                                          <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
-                                            Pre-Approve OT
-                                          </Button>
+                                          {empRec.status === 'ABSENT' ? (
+                                            <Button size="small" variant="contained" color="primary" onClick={(e) => { e.stopPropagation(); handleOpenSessionModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                              + Add Session
+                                            </Button>
+                                          ) : (
+                                            <>
+                                              {empRec.sessions?.length > 0 && (
+                                                <>
+                                                  <Button 
+                                                    size="small" 
+                                                    variant={empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "contained" : "outlined"} 
+                                                    color="secondary" 
+                                                    onClick={(e) => { e.stopPropagation(); handlePreContinue(empRec); }} 
+                                                    sx={{ fontSize: '0.7rem' }}
+                                                  >
+                                                    {empRec.sessions?.[empRec.sessions.length - 1]?.pre_continue_approved ? "Pre-Continued" : "Pre-Continue"}
+                                                  </Button>
+                                                  <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleOpenOtModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                                    Pre-Approve OT
+                                                  </Button>
+                                                </>
+                                              )}
+                                              <Button size="small" variant="outlined" color="info" onClick={(e) => { e.stopPropagation(); handleOpenSessionModal(empRec); }} sx={{ fontSize: '0.7rem' }}>
+                                                Add Session
+                                              </Button>
+                                            </>
+                                          )}
                                         </Box>
                                       </Box>
                                     </AccordionSummary>
@@ -1267,6 +1334,59 @@ export default function Attendance() {
           </Button>
           <Button onClick={handleSubmitPreApprovedOt} variant="contained" color="primary">
             Pre-Approve
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog for Admin to add manual session */}
+      <Dialog open={addSessionModalOpen} onClose={() => setAddSessionModalOpen(false)}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Add Manual Session</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Add a manual session for {selectedRecordForSession?.employee_name} on {selectedRecordForSession?.date}.
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField 
+              label="Check In Time (HH:MM)" 
+              type="time" 
+              value={manualCheckIn} 
+              onChange={(e) => setManualCheckIn(e.target.value)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField 
+              label="Check Out Time (HH:MM)" 
+              type="time" 
+              value={manualCheckOut} 
+              onChange={(e) => setManualCheckOut(e.target.value)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Session Type</InputLabel>
+              <Select value={manualSessionType} label="Session Type" onChange={(e) => setManualSessionType(e.target.value)}>
+                <MenuItem value="Regular">Regular</MenuItem>
+                <MenuItem value="OT">Overtime (OT)</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField 
+              label="Reason (Optional)" 
+              value={manualReason} 
+              onChange={(e) => setManualReason(e.target.value)}
+              fullWidth
+              multiline
+              rows={2}
+            />
+            <FormControlLabel
+              control={<Checkbox checked={manualAutoCheckout} onChange={(e) => setManualAutoCheckout(e.target.checked)} />}
+              label="Mark as Auto-Checkout"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddSessionModalOpen(false)} color="inherit">Cancel</Button>
+          <Button onClick={handleAddManualSession} variant="contained" color="primary">
+            Add Session
           </Button>
         </DialogActions>
       </Dialog>

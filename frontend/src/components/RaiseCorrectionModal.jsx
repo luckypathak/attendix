@@ -11,6 +11,17 @@ export default function RaiseCorrectionModal({ open, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  React.useEffect(() => {
+    if (open) {
+      setRequestType('MISSED_OUT');
+      setDate('');
+      setReason('');
+      setCheckInTime('');
+      setCheckOutTime('');
+      setError(null);
+    }
+  }, [open]);
+
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);

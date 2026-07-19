@@ -99,10 +99,10 @@ def auto_absent_marker_task(self):
     marked = 0
     for profile in profiles:
         shift = profile.shift
-        if shift:
-            shift_start = datetime.datetime.combine(today, shift.start_time)
-            shift_start = timezone.make_aware(shift_start, timezone.get_current_timezone())
-            if (now - shift_start).total_seconds() / 60 > 30:
+        if shift and shift.end_time:
+            shift_end = datetime.datetime.combine(today, shift.end_time)
+            shift_end = timezone.make_aware(shift_end, timezone.get_current_timezone())
+            if now > shift_end:
                 Attendance.objects.create(employee=profile.user, date=today, status='ABSENT')
                 marked += 1
     return f"Marked {marked} employees as ABSENT."

@@ -40,6 +40,19 @@ class PayrollService:
         unpaid_leaves = 0.0
         holidays_count = 0.0
 
+        def is_unpaid_absent(check_date):
+            att = Attendance.objects.filter(employee=employee, date=check_date).first()
+            if att:
+                if att.status == Attendance.Statuses.ABSENT: return True
+                if att.check_in_time and not att.check_out_time: return True
+                if att.status == Attendance.Statuses.LEAVE:
+                    lreq = LeaveRequest.objects.filter(employee=employee, start_date__lte=check_date, end_date__gte=check_date, status='APPROVED').first()
+                    return (lreq and lreq.leave_type == 'UNPAID')
+                return False
+            else:
+                if check_date.weekday() == 6 or Holiday.objects.filter(company=company, date=check_date).exists(): return False
+                return True
+
         # Loop through every day of the month to calculate attendance status
         for day in range(1, days_in_month + 1):
             date = datetime.date(year, month, day)
@@ -86,16 +99,27 @@ class PayrollService:
                     else:
                         worked_days += 1.0
                 elif attendance.status == Attendance.Statuses.HOLIDAY:
-                    worked_days += 1.0
-                    holidays_count += 1.0
+                    prev_day = date - datetime.timedelta(days=1)
+                    next_day = date + datetime.timedelta(days=1)
+                    if is_unpaid_absent(prev_day) and is_unpaid_absent(next_day):
+                        absent_days += 1.0
+                    else:
+                        worked_days += 1.0
+                        holidays_count += 1.0
                 elif attendance.status == Attendance.Statuses.ABSENT:
                     absent_days += 1.0
             else:
-                # No attendance record, check if it was a Holiday
+                # No attendance record, check if it was a Holiday or Sunday
                 is_holiday = Holiday.objects.filter(company=company, date=date).exists()
-                if is_holiday:
-                    worked_days += 1.0
-                    holidays_count += 1.0
+                is_sunday = (date.weekday() == 6)
+                if is_holiday or is_sunday:
+                    prev_day = date - datetime.timedelta(days=1)
+                    next_day = date + datetime.timedelta(days=1)
+                    if is_unpaid_absent(prev_day) and is_unpaid_absent(next_day):
+                        absent_days += 1.0
+                    else:
+                        worked_days += 1.0
+                        holidays_count += 1.0
                 else:
                     # No record, not a holiday => Absent
                     absent_days += 1.0

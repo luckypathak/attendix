@@ -310,6 +310,9 @@ class AttendanceService:
         
         all_sessions = attendance.sessions.all().order_by('check_in_time')
         if not all_sessions.exists():
+            attendance.status = 'ABSENT'
+            attendance.total_worked_hours = 0
+            attendance.save()
             return
 
         first_session = all_sessions.first()
@@ -580,6 +583,9 @@ class AttendanceService:
             date=correction.date,
             defaults={'status': 'PRESENT'}
         )
+        if attendance.status == 'ABSENT':
+            attendance.status = 'PRESENT'
+            attendance.save()
         
         # Depending on the correction type, modify sessions
         from django.utils import timezone
@@ -608,6 +614,7 @@ class AttendanceService:
             if session:
                 session.check_out_time = correction.requested_check_out
                 session.check_out_captured_image = correction.check_out_photo
+                session.auto_checkout = False
                 session.save()
                 
         # If both
@@ -618,6 +625,7 @@ class AttendanceService:
                 check_out_time=correction.requested_check_out,
                 captured_image=correction.check_in_photo,
                 check_out_captured_image=correction.check_out_photo,
+                auto_checkout=False
             )
             
         elif correction.request_type == 'CONTINUE_SHIFT':

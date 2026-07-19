@@ -436,6 +436,94 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         session.save()
         return Response({"detail": "Pre-Continue toggled successfully.", "pre_continue_approved": session.pre_continue_approved}, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='add-manual-session')
+    def add_manual_session(self, request, pk=None):
+        if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
+            return Response({"detail": "Only managers/admins can add sessions manually."}, status=status.HTTP_403_FORBIDDEN)
+        
+        attendance = self.get_object()
+        
+        check_in_str = request.data.get('check_in_time')
+        check_out_str = request.data.get('check_out_time')
+        auto_checkout = str(request.data.get('auto_checkout', 'false')).lower() == 'true'
+        
+        if not check_in_str:
+            return Response({"detail": "Check In Time is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        import datetime
+        from django.utils import timezone
+        
+        def parse_time(t_str):
+            if not t_str: return None
+            try:
+                return datetime.datetime.strptime(t_str, '%H:%M').time()
+            except ValueError:
+                return datetime.datetime.strptime(t_str, '%H:%M:%S').time()
+                
+        try:
+            check_in_time = parse_time(check_in_str)
+            check_out_time = parse_time(check_out_str)
+        except Exception as e:
+            return Response({"detail": f"Invalid time format. Use HH:MM: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        session = AttendanceSession.objects.create(
+            attendance=attendance,
+            check_in_time=check_in_time,
+            check_out_time=check_out_time,
+            check_in_lat=0,
+            check_in_lng=0,
+            auto_checkout=auto_checkout
+        )
+        if check_out_time:
+            session.check_out_lat = 0
+            session.check_out_lng = 0
+            session.save()
+            
+        session_type = request.data.get('session_type', 'Regular')
+        reason = request.data.get('reason', '')
+        
+        from attendix.apps.attendance.models import AttendanceAuditLog, Overtime
+        AttendanceAuditLog.objects.create(
+            session=session,
+            user=request.user,
+            old_value={},
+            new_value={"action": "Manual Session Added", "type": session_type, "check_in_time": str(check_in_time), "check_out_time": str(check_out_time)},
+            reason=reason or "Admin manually added session"
+        )
+        
+        if session_type == 'OT' and check_out_time:
+            # Calculate hours
+            check_in_dt = datetime.datetime.combine(attendance.date, check_in_time)
+            check_out_dt = datetime.datetime.combine(attendance.date, check_out_time)
+            if check_out_dt < check_in_dt:
+                check_out_dt += datetime.timedelta(days=1)
+            hours = (check_out_dt - check_in_dt).total_seconds() / 3600.0
+            
+            Overtime.objects.create(
+                employee=attendance.employee,
+                attendance=attendance,
+                session=session,
+                date=attendance.date,
+                hours=round(hours, 2),
+                status='APPROVED',
+                approved_by=request.user
+            )
+            session.ot_status = 'APPROVED'
+            session.ot_request_created = True
+            session.save()
+            
+        attendance.status = 'PRESENT'
+        attendance.save()
+        
+        from .services import AttendanceService
+        AttendanceService._recalculate_attendance_metrics(
+            attendance,
+            attendance.shift or AttendanceService.get_active_shift(attendance.employee),
+            attendance.date
+        )
+        
+        return Response({"detail": "Manual session added successfully.", "id": session.id}, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['patch'], url_path='edit-session')
     def edit_session(self, request):
         if request.user.role not in ['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER']:
@@ -606,13 +694,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         
         session.delete()
         
-        AttendanceAuditLog.objects.create(
-            session=None,  # session is deleted
-            edited_by=request.user,
-            old_value=old_value,
-            new_value={'deleted': True},
-            reason="Admin deleted session"
-        )
+        # Audit log creation omitted because session is deleted and on_delete is CASCADE
         
         # Recalculate metrics for the parent attendance
         from .services import AttendanceService
