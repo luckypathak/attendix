@@ -357,14 +357,16 @@ class AttendanceService:
         if (total_worked_hours < (shift_hours - 0.17) and not has_active) or (has_three_strikes and has_auto_checkout_today):
             attendance.status = Attendance.Statuses.HALF_DAY
         else:
-            # If they completed the full shift, restore status from HALF_DAY to PRESENT or LATE
-            if attendance.status == Attendance.Statuses.HALF_DAY:
+            # If they completed the full shift, restore status from HALF_DAY/ABSENT to PRESENT or LATE
+            if attendance.status in [Attendance.Statuses.HALF_DAY, Attendance.Statuses.ABSENT]:
                 if shift:
                     shift_start = shift.start_time
                     dummy_date = datetime.date(2000, 1, 1)
                     start_datetime = datetime.datetime.combine(dummy_date, shift_start)
-                    if attendance.check_in_time:
-                        checkin_datetime = datetime.datetime.combine(dummy_date, attendance.check_in_time)
+                    # Use the first session's check-in time since attendance.check_in_time isn't always reliable
+                    checkin_time = first_session.check_in_time if first_session else attendance.check_in_time
+                    if checkin_time:
+                        checkin_datetime = datetime.datetime.combine(dummy_date, checkin_time)
                         difference_mins = (checkin_datetime - start_datetime).total_seconds() / 60.0
                         if difference_mins > shift.grace_period_minutes:
                             attendance.status = Attendance.Statuses.LATE
