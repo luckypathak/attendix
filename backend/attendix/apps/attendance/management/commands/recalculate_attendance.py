@@ -20,42 +20,20 @@ class Command(BaseCommand):
             
             if not shift:
                 continue
-                
-            shift_start = shift.start_time
-            time_now = attendance.check_in_time
-            today = attendance.date
-            
-            dummy_date = datetime.date(2000, 1, 1)
-            start_datetime = datetime.datetime.combine(dummy_date, shift_start)
-            checkin_datetime = datetime.datetime.combine(dummy_date, time_now)
-            
-            difference_mins = (checkin_datetime - start_datetime).total_seconds() / 60.0
-            
-            status = Attendance.Statuses.PRESENT
-            if difference_mins > shift.grace_period_minutes:
-                start_of_month = today.replace(day=1)
-                late_count = Attendance.objects.filter(
-                    employee=employee,
-                    date__gte=start_of_month,
-                    date__lt=today,
-                    status__in=[Attendance.Statuses.LATE, Attendance.Statuses.HALF_DAY]
-                ).count()
 
-                company_settings = employee.company
-                late_limit = company_settings.late_limit_for_half_day if company_settings else 3
-
-                if late_count >= late_limit:
-                    status = Attendance.Statuses.HALF_DAY
-                else:
-                    status = Attendance.Statuses.LATE
-                    
-            if attendance.status != status or attendance.shift_id != shift.id:
+            old_status = attendance.status
+            
+            # Recalculate status using the updated services logic
+            # We don't want to mess up total_worked_hours or check-in, so just sync metrics
+            AttendanceService._recalculate_attendance_metrics(attendance, shift, attendance.date)
+            
+            new_status = attendance.status
+            if old_status != new_status or attendance.shift_id != shift.id:
                 self.stdout.write(
-                    f"[{employee.username}] {today} | "
-                    f"Old: {attendance.status} -> New: {status} | "
-                    f"Shift: {shift.name} ({shift.start_time}) | CheckIn: {time_now}"
+                    f"[{employee.username}] {attendance.date} | "
+                    f"Old: {old_status} -> New: {new_status} | "
+                    f"Shift: {shift.name} ({shift.start_time}) | CheckIn: {attendance.check_in_time}"
                 )
-                attendance.status = status
                 attendance.shift = shift
                 attendance.save()
                 fixed_count += 1

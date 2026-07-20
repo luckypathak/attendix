@@ -344,38 +344,46 @@ class AttendanceService:
         else:
             attendance.break_hours = 0.0
 
-        # Half-day rule: If worked hours is less than shift duration (or 6.0 hrs fallback), downgrade status to HALF_DAY
-        shift_hours = float(shift.duration_hours) if shift else 9.0
+        # Calculate Half Day / Present based on Company Attendance Policy
+        company = getattr(attendance.employee, 'company', None)
+        full_day_hours = float(company.full_day_hours) if company else 8.0
+        half_day_hours = float(company.half_day_hours) if company else 4.0
 
         # Check if user has 3 or more auto-checkouts (3 strikes rule)
         profile = getattr(attendance.employee, 'employee_profile', None)
         has_three_strikes = profile and profile.checkout_missed_count >= 3
         has_auto_checkout_today = attendance.sessions.filter(auto_checkout=True).exists()
 
-        # Add a 10-minute (0.17 hours) tolerance for the shift completion check
-        # This prevents 4.99 hours from being flagged as HALF_DAY on a 5.0 hour shift.
-        if (total_worked_hours < (shift_hours - 0.17) and not has_active) or (has_three_strikes and has_auto_checkout_today):
+        if total_worked_hours >= full_day_hours:
+            attendance.status = Attendance.Statuses.PRESENT
+        elif total_worked_hours >= half_day_hours:
             attendance.status = Attendance.Statuses.HALF_DAY
         else:
-            # If they completed the full shift, restore status from HALF_DAY/ABSENT to PRESENT or LATE
-            if attendance.status in [Attendance.Statuses.HALF_DAY, Attendance.Statuses.ABSENT]:
-                if shift:
-                    shift_start = shift.start_time
-                    dummy_date = datetime.date(2000, 1, 1)
-                    start_datetime = datetime.datetime.combine(dummy_date, shift_start)
-                    # Use the first session's check-in time since attendance.check_in_time isn't always reliable
-                    checkin_time = first_session.check_in_time if first_session else attendance.check_in_time
-                    if checkin_time:
-                        checkin_datetime = datetime.datetime.combine(dummy_date, checkin_time)
-                        difference_mins = (checkin_datetime - start_datetime).total_seconds() / 60.0
-                        if difference_mins > shift.grace_period_minutes:
-                            attendance.status = Attendance.Statuses.LATE
-                        else:
-                            attendance.status = Attendance.Statuses.PRESENT
-                    else:
-                        attendance.status = Attendance.Statuses.PRESENT
-                else:
-                    attendance.status = Attendance.Statuses.PRESENT
+            if has_active:
+                # Still working, keep current status if it was PRESENT or LATE
+                pass
+            else:
+                attendance.status = Attendance.Statuses.ABSENT
+
+        # Force HALF_DAY if 3 strikes rule applies and they haven't been marked absent
+        if has_three_strikes and has_auto_checkout_today and attendance.status != Attendance.Statuses.ABSENT:
+            attendance.status = Attendance.Statuses.HALF_DAY
+
+        # Restore LATE status if they were originally LATE (assuming they completed the required hours)
+        if attendance.status == Attendance.Statuses.PRESENT:
+            if shift:
+                shift_start = shift.start_time
+                dummy_date = datetime.date(2000, 1, 1)
+                start_datetime = datetime.datetime.combine(dummy_date, shift_start)
+                # Use the first session's check-in time since attendance.check_in_time isn't always reliable
+                checkin_time = first_session.check_in_time if first_session else attendance.check_in_time
+                if checkin_time:
+                    checkin_datetime = datetime.datetime.combine(dummy_date, checkin_time)
+                    difference_mins = (checkin_datetime - start_datetime).total_seconds() / 60.0
+                    if difference_mins > shift.grace_period_minutes:
+                        attendance.status = Attendance.Statuses.LATE
+
+        shift_hours = float(shift.duration_hours) if shift else 9.0
 
         # Calculate session-level regular and overtime hours
         regular_accumulated = 0.0

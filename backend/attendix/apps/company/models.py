@@ -31,6 +31,8 @@ class Company(SoftDeleteModel):
     grace_period_minutes = models.IntegerField(default=15)
     late_limit_for_half_day = models.IntegerField(default=3)
     auto_checkout_hours = models.DecimalField(max_digits=4, decimal_places=2, default=10.00) # Auto checkout if forgot
+    full_day_hours = models.DecimalField(max_digits=4, decimal_places=2, default=8.00)
+    half_day_hours = models.DecimalField(max_digits=4, decimal_places=2, default=4.00)
     
     # Location tracking settings
     office_radius_meters = models.IntegerField(default=100)
