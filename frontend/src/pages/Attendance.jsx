@@ -906,7 +906,7 @@ export default function Attendance() {
               )}
 
               {/* ACCORDION IMPLEMENTATION */}
-              {isAdmin ? (
+              {isAdmin && adminTab === 0 && (
                 <Box>
                   {Object.keys(groupedRecords).length === 0 ? (
                     <Typography color="text.secondary">No attendance logs available.</Typography>
@@ -1089,7 +1089,9 @@ export default function Attendance() {
                     </Box>
                   )}
                 </Box>
-              ) : (
+              )}
+              
+              {!isAdmin && (
                 /* Non-Admin Employee View */
                 <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid rgba(255,255,255,0.05)' }}>
                   <Table>
@@ -1161,7 +1163,7 @@ export default function Attendance() {
           </Card>
         </Grid>
         {/* Overtime Approval Registry for Admin/Managers */}
-        {isAdmin && (
+        {isAdmin && adminTab === 1 && (
           <Grid item xs={12}>
             <Card sx={{ border: (theme) => `1px solid ${theme.palette.divider}` }}>
               <CardContent>
