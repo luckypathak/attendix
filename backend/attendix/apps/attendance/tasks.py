@@ -1,10 +1,11 @@
 import logging
 import math
+import datetime
+from datetime import timedelta
 from celery import shared_task
 from django.utils import timezone
-from datetime import timedelta
-import datetime
 from django.db import connection
+from django.db.models import F
 from attendix.apps.attendance.models import Attendance, AttendanceSession, LocationPing, AttendanceCorrectionRequest
 from attendix.apps.authentication.models import User
 from attendix.apps.notifications.services import NotificationService
@@ -23,23 +24,29 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 @shared_task(bind=True, max_retries=3)
-def check_active_overtimes_task(self):
-    """1. Auto Checkout Engine: Every minute"""
-    logger.info("Starting Auto Checkout Engine.")
-    
-    from attendix.apps.attendance.models import AttendanceSession
-    if not AttendanceSession.objects.filter(check_out_time__isnull=True).exists():
-        return "Skipped (No active users checked in)"
+def dynamic_auto_checkout_task(self, session_id):
+    """Dynamic Auto Checkout Engine: Runs at exact expected shift end + grace period"""
+    logger.info(f"Running dynamic auto checkout for session {session_id}")
+    try:
+        session = AttendanceSession.objects.get(id=session_id)
+    except AttendanceSession.DoesNotExist:
+        return "Session not found."
         
+    if session.check_out_time is not None:
+        return "Already checked out."
+        
+    # Check out the user
+    now = timezone.localtime(timezone.now())
+    
+    # We must auto checkout at the EXACT shift end, NOT the grace period time.
     from attendix.apps.attendance.services import AttendanceService
-    AttendanceService.check_active_overtimes_and_autocheckout()
-    return "Check completed."
+    AttendanceService.perform_auto_checkout(session)
+    return "Dynamic Auto-checkout performed."
 
 @shared_task(bind=True, max_retries=3)
 def location_tracker_task(self):
-    """2. Location Tracker: Every 5 minutes"""
+    """Location Tracker: Dynamic (Only runs if active sessions exist)"""
     logger.info("Starting Location Tracker.")
-    from attendix.apps.attendance.models import AttendanceSession
     active_sessions = AttendanceSession.objects.filter(check_out_time__isnull=True).select_related('attendance__employee__company')
     
     if not active_sessions.exists():
@@ -63,97 +70,35 @@ def location_tracker_task(self):
                     grace_period_mins = company.geofence_grace_period_minutes if company.geofence_grace_period_minutes else 5
                     out_duration = (now - last_ping.timestamp).total_seconds() / 60
                     if out_duration >= grace_period_mins:
-                        # Auto checkout
-                        session.check_out_time = now.time()
-                        session.auto_checkout = True
-                        session.checkout_reason = 'LEFT_OFFICE_GEOFENCE'
-                        session.save()
-                        session.attendance.check_out_time = session.check_out_time
-                        session.attendance.save()
-                        
                         from attendix.apps.attendance.services import AttendanceService
-                        shift = session.attendance.shift or getattr(employee.employee_profile, 'shift', None)
-                        AttendanceService._recalculate_attendance_metrics(session.attendance, shift, now.date())
+                        AttendanceService.perform_auto_checkout(session, reason='LEFT_OFFICE_GEOFENCE')
                         logger.info(f"Auto-checked out {employee.username} due to geofence.")
     return "Location tracking complete."
 
 @shared_task(bind=True, max_retries=3)
-def attendance_status_recalculation_task(self):
-    """3. Attendance Status Recalculation: Every 15 minutes"""
-    logger.info("Recalculating attendance metrics.")
-    from attendix.apps.attendance.models import AttendanceSession
-    if not AttendanceSession.objects.filter(check_out_time__isnull=True).exists():
-        return "Skipped (No active users checked in)"
-        
-    from attendix.apps.attendance.services import AttendanceService
-    today = timezone.localtime(timezone.now()).date()
-    active_att = Attendance.objects.filter(date=today, sessions__check_out_time__isnull=True).distinct()
-    for att in active_att:
-        shift = att.shift or getattr(att.employee.employee_profile, 'shift', None)
-        if shift:
-            AttendanceService._recalculate_attendance_metrics(att, shift, today)
-    return f"Recalculated {active_att.count()} attendances."
-
-@shared_task(bind=True, max_retries=3)
 def auto_absent_marker_task(self):
-    """4. Auto Absent Marker: Every 30 minutes"""
+    """Auto Absent Marker: Runs ONCE daily at Midnight (00:00)"""
     logger.info("Starting Auto Absent Marker.")
     now = timezone.localtime(timezone.now())
-    today = now.date()
+    today = now.date() - timedelta(days=1) # Because it runs at midnight, we check for YESTERDAY
     
-    # Do not mark ABSENT on Sundays (weekday() == 6)
+    # Do not mark ABSENT on Sundays (if yesterday was Sunday)
     if today.weekday() == 6:
-        logger.info("Today is Sunday. Skipping auto absent marker.")
+        logger.info("Yesterday was Sunday. Skipping auto absent marker.")
         return "Skipped (Sunday)"
     
-    # Simple logic: users without attendance today, whose shift started > 30 mins ago
     from attendix.apps.employee.models import EmployeeProfile
     profiles = EmployeeProfile.objects.exclude(user__attendance_records__date=today).exclude(user__leaves__start_date__lte=today, user__leaves__end_date__gte=today, user__leaves__status='APPROVED').select_related('shift', 'user')
     
     marked = 0
     for profile in profiles:
-        shift = profile.shift
-        if shift and shift.end_time:
-            shift_end = datetime.datetime.combine(today, shift.end_time)
-            shift_end = timezone.make_aware(shift_end, timezone.get_current_timezone())
-            if now > shift_end:
-                Attendance.objects.create(employee=profile.user, date=today, status='ABSENT')
-                marked += 1
-    return f"Marked {marked} employees as ABSENT."
-
-@shared_task(bind=True, max_retries=3)
-def pending_ot_reminder_task(self):
-    """5. Pending OT Reminder: Every 10 minutes"""
-    logger.info("Starting Pending OT Reminder.")
-    pending = AttendanceCorrectionRequest.objects.filter(status='PENDING', request_type__in=['CONTINUE_SHIFT', 'OT_APPROVAL'])
-    for req in pending:
-        # Notify admins again if it's getting old
-        admins = User.objects.filter(company=req.employee.company, role__in=['SUPER_ADMIN', 'COMPANY_ADMIN', 'MANAGER'])
-        for admin in admins:
-            NotificationService.create_in_app_notification(
-                recipient=admin,
-                title="Pending Request Reminder",
-                body=f"Reminder: {req.employee.username} has a pending {req.get_request_type_display()} request waiting for approval."
-            )
-    return f"Sent reminders for {pending.count()} requests."
-
-@shared_task(bind=True, max_retries=3)
-def analytics_refresh_task(self):
-    """6. Analytics Refresh: Every 15 minutes"""
-    logger.info("Refreshing Analytics Cache.")
-    # Here we would bust the dashboard cache, if we use one
-    return "Analytics refreshed."
-
-@shared_task(bind=True, max_retries=3)
-def payroll_sync_task(self):
-    """7. Payroll Sync: Nightly"""
-    logger.info("Starting Nightly Payroll Sync.")
-    # Add real payroll logic here when built
-    return "Payroll sync complete."
+        Attendance.objects.create(employee=profile.user, date=today, status='ABSENT')
+        marked += 1
+    return f"Marked {marked} employees as ABSENT for {today}."
 
 @shared_task(bind=True, max_retries=3)
 def cleanup_expired_requests_task(self):
-    """8. Cleanup Expired Requests: Daily"""
+    """Cleanup Expired Requests: Daily"""
     logger.info("Cleaning up expired requests.")
     cutoff = timezone.localtime(timezone.now()) - timedelta(days=7)
     expired = AttendanceCorrectionRequest.objects.filter(status='PENDING', created_at__lte=cutoff)
@@ -162,35 +107,8 @@ def cleanup_expired_requests_task(self):
     return f"Cleaned up {count} expired requests."
 
 @shared_task(bind=True, max_retries=3)
-def database_health_check_task(self):
-    """9. Database Health Check: Hourly"""
-    logger.info("Checking DB Health.")
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT 1")
-        row = cursor.fetchone()
-    return "DB Health OK."
-
-@shared_task(bind=True, max_retries=3)
-def missed_checkout_reconciliation_task(self):
-    """10. Missed Checkout Reconciliation: Daily"""
-    logger.info("Reconciling missed checkouts.")
-    today = timezone.localtime(timezone.now()).date()
-    missed = AttendanceSession.objects.filter(check_out_time__isnull=True, attendance__date__lt=today)
-    count = missed.count()
-    from django.db.models import F
-    for session in missed:
-        profile = getattr(session.attendance.employee, 'employee_profile', None)
-        if profile:
-            profile.checkout_missed_count = F('checkout_missed_count') + 1
-            profile.save(update_fields=['checkout_missed_count'])
-        session.check_out_time = datetime.time(23, 59, 59)
-        session.auto_checkout = True
-        session.checkout_reason = 'AUTO_CHECKOUT_RECONCILIATION'
-        session.save()
-    return f"Reconciled {count} missed sessions."
-
-@shared_task(bind=True, max_retries=3)
 def cleanup_attendance_photos_task(self):
+    """Cleanup Attendance Photos: Daily"""
     today = timezone.localtime(timezone.now()).date()
     cutoff_date = today - timedelta(days=2)
     
@@ -198,4 +116,3 @@ def cleanup_attendance_photos_task(self):
     for att in parent_records:
         att.captured_image.delete(save=True)
     return "Cleanup photos done."
-

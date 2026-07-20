@@ -256,6 +256,19 @@ class AttendanceService:
             accuracy=accuracy
         )
 
+        # Event-Driven Architecture: Schedule dynamic auto-checkout
+        active_shift = shift or cls.get_active_shift(employee)
+        if active_shift and active_shift.end_time:
+            shift_end_dt = timezone.make_aware(datetime.datetime.combine(today, active_shift.end_time))
+            if active_shift.end_time < active_shift.start_time:
+                shift_end_dt += datetime.timedelta(days=1)
+            
+            grace_mins = employee.company.grace_period_minutes if employee.company and employee.company.grace_period_minutes else 15
+            deadline = shift_end_dt + datetime.timedelta(minutes=grace_mins)
+            
+            from attendix.apps.attendance.tasks import dynamic_auto_checkout_task
+            dynamic_auto_checkout_task.apply_async(args=[session.id], eta=deadline)
+
         return attendance
 
     @classmethod
@@ -537,13 +550,18 @@ class AttendanceService:
                         grace_period_mins = getattr(shift, 'grace_period_minutes', 15)
                         final_checkout_dt = shift_end_dt + datetime.timedelta(minutes=grace_period_mins)
 
-                        cls._perform_auto_checkout(session, employee, attendance, final_checkout_dt, shift)
-
+                        cls.perform_auto_checkout(session, reason='AUTO_CHECKOUT_TIMEOUT', checkout_time=final_checkout_dt.time())
     @classmethod
-    def _perform_auto_checkout(cls, session, employee, attendance, checkout_dt, shift):
+    def perform_auto_checkout(cls, session, reason='AUTO_CHECKOUT', checkout_time=None):
         from django.db.models import F
         from attendix.apps.notifications.services import NotificationService
         from attendix.apps.authentication.models import User
+        import datetime
+        from django.utils import timezone
+        
+        now = timezone.localtime(timezone.now())
+        employee = session.attendance.employee
+        attendance = session.attendance
 
         profile = getattr(employee, 'employee_profile', None)
         missed_count = 1
@@ -553,9 +571,9 @@ class AttendanceService:
             profile.refresh_from_db()
             missed_count = profile.checkout_missed_count
 
-        session.check_out_time = checkout_dt.time()
+        session.check_out_time = checkout_time or now.time()
         session.auto_checkout = True
-        session.checkout_reason = 'AUTO_CHECKOUT'
+        session.checkout_reason = reason
         session.checkout_missed_count = missed_count
         session.save()
 
@@ -570,18 +588,18 @@ class AttendanceService:
             NotificationService.create_in_app_notification(
                 recipient=admin,
                 title="Employee Auto Checked Out",
-                body=f"Employee {employee.username} was auto checked out (No admin response)."
+                body=f"Employee {employee.username} was auto checked out (Reason: {reason})."
             )
 
-        # Recalculate metrics
+        shift = attendance.shift or cls.get_active_shift(employee)
         cls._recalculate_attendance_metrics(attendance, shift, attendance.date)
 
     @classmethod
     def process_auto_checkout(cls):
         """
-        Fallback compatibility wrapper calling the new check_active_overtimes_and_autocheckout logic.
+        Deprecated. Now using Event-Driven dynamic_auto_checkout_task
         """
-        cls.check_active_overtimes_and_autocheckout()
+        pass
 
 
 
@@ -646,11 +664,22 @@ class AttendanceService:
                 correction.session.continue_shift = True
                 correction.session.save()
                 
+                # Schedule new checkout exactly 2 hours from now by default if no hours explicitly passed
+                from attendix.apps.attendance.tasks import dynamic_auto_checkout_task
+                deadline = now + datetime.timedelta(hours=2)
+                dynamic_auto_checkout_task.apply_async(args=[correction.session.id], eta=deadline)
+                
         elif correction.request_type == 'OT_APPROVAL':
             if correction.session:
                 correction.session.ot_status = 'APPROVED'
                 correction.session.ot_request_created = True
                 correction.session.save()
+                
+                # Setup 2 hours OT by default
+                from attendix.apps.attendance.tasks import dynamic_auto_checkout_task
+                deadline = now + datetime.timedelta(hours=2)
+                dynamic_auto_checkout_task.apply_async(args=[correction.session.id], eta=deadline)
+                
                 from attendix.apps.attendance.models import Overtime
                 Overtime.objects.update_or_create(
                     employee=attendance.employee,
@@ -667,8 +696,7 @@ class AttendanceService:
         elif correction.request_type == 'LATE_CHECKIN_WHILE_ACTIVE':
             # Admin approved second checkin. We should checkout the previous session and create a new one
             if correction.session and correction.session.check_out_time is None:
-                shift = attendance.shift or cls.get_active_shift(attendance.employee)
-                cls._perform_auto_checkout(correction.session, attendance.employee, attendance, now, shift)
+                cls.perform_auto_checkout(correction.session, reason='ADMIN_APPROVED_NEW_CHECKIN')
             # Now create a new session
             AttendanceSession.objects.create(
                 attendance=attendance,
