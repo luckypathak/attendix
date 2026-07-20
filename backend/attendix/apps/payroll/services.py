@@ -28,7 +28,12 @@ class PayrollService:
             else:
                 accumulated_already_paid = float(existing_payroll.already_paid)
 
-        base_salary = float(profile.base_salary)
+        allocations = profile.firm_allocations.all()
+        if allocations.exists():
+            base_salary = sum([float(alloc.base_salary) for alloc in allocations])
+        else:
+            base_salary = float(profile.base_salary)
+            
         hourly_rate = float(profile.hourly_rate)
         company = employee.company
 
@@ -160,7 +165,6 @@ class PayrollService:
                 advance_deduction += to_deduct
 
         # 5. Salary Branch Allocation Calculation
-        allocations = profile.firm_allocations.all()
         branch_details = []
 
         total_pf_deduction = 0.0

@@ -10,7 +10,8 @@ from .models import (
     Shift, Attendance, AttendanceSession, Overtime, LocationPing, AttendanceCorrectionRequest
 )
 from .serializers import (
-    ShiftSerializer, AttendanceSerializer, AttendanceSessionSerializer, OvertimeSerializer, AttendanceCorrectionSerializer
+    ShiftSerializer, AttendanceSerializer, AttendanceSessionSerializer, OvertimeSerializer, AttendanceCorrectionSerializer,
+    CheckInSerializer, CheckOutSerializer
 )
 from .services import AttendanceService
 

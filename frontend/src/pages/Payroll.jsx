@@ -6,10 +6,132 @@ import {
   TextField, Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Paper, Chip, Alert, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, CardHeader,
-  IconButton, MenuItem
+  IconButton, MenuItem, Collapse
 } from '@mui/material';
-import { IndianRupee, Send, ShieldAlert, Sparkles, Download } from 'lucide-react';
+import { IndianRupee, Send, ShieldAlert, Sparkles, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../services/api';
+
+const PayslipRow = ({ p, isAdmin, handlePayout, handleRemoveBonus }) => {
+  const [open, setOpen] = useState(false);
+  const hasMultipleBranches = p.branch_distributions && p.branch_distributions.length > 1;
+
+  return (
+    <React.Fragment>
+      <TableRow sx={{ '& > *': { borderBottom: hasMultipleBranches ? 'unset' : undefined } }}>
+        <TableCell>
+          {hasMultipleBranches && (
+            <IconButton aria-label="expand row" size="small" onClick={() => setOpen(!open)}>
+              {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </IconButton>
+          )}
+        </TableCell>
+        {isAdmin && <TableCell sx={{ fontWeight: 600 }}>{p.employee_name}</TableCell>}
+        <TableCell>{p.month}/{p.year}</TableCell>
+        <TableCell>
+          ₹{parseFloat(p.base_salary).toLocaleString('en-IN')}
+          {parseFloat(p.bonus) > 0 && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+              <Typography sx={{ fontSize: '0.75rem', color: 'success.main', fontWeight: 500 }}>
+                +₹{parseFloat(p.bonus).toLocaleString('en-IN')} Bonus
+              </Typography>
+              {p.status === 'DRAFT' && (
+                <Typography 
+                  component="span"
+                  onClick={() => handleRemoveBonus(p.id)}
+                  sx={{ 
+                    fontSize: '0.7rem', 
+                    color: 'error.main', 
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    ml: 0.5,
+                    '&:hover': { color: 'error.dark' }
+                  }}
+                >
+                  (Remove)
+                </Typography>
+              )}
+            </Box>
+          )}
+        </TableCell>
+        <TableCell>₹{parseFloat(p.overtime_pay).toLocaleString('en-IN')}</TableCell>
+        <TableCell>
+          ₹{parseFloat(parseFloat(p.advance_deduction) + parseFloat(p.unpaid_leave_deduction) + parseFloat(p.absent_deduction)).toLocaleString('en-IN')}
+          {parseFloat(p.already_paid) > 0 && (
+            <Box sx={{ fontSize: '0.75rem', color: 'error.main', mt: 0.5 }}>
+              -₹{parseFloat(p.already_paid).toLocaleString('en-IN')} Prev Paid
+            </Box>
+          )}
+        </TableCell>
+        <TableCell>
+          {parseFloat(p.pf_deduction) > 0 ? (
+            <Typography color="error.main" variant="body2" sx={{ fontWeight: 600 }}>
+              -₹{parseFloat(p.pf_deduction).toLocaleString('en-IN')}
+            </Typography>
+          ) : (
+            '--'
+          )}
+        </TableCell>
+        <TableCell sx={{ fontWeight: 700 }}>₹{parseFloat(p.net_salary).toLocaleString('en-IN')}</TableCell>
+        <TableCell>
+          <Chip 
+            label={p.status} 
+            size="small" 
+            color={p.status === 'PAID' ? 'success' : p.status === 'APPROVED' ? 'primary' : 'default'} 
+            sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+          />
+        </TableCell>
+        <TableCell>
+          {isAdmin && p.status === 'DRAFT' ? (
+            <Button variant="outlined" size="small" onClick={() => handlePayout(p.id)}>
+              Payout
+            </Button>
+          ) : (
+            <IconButton color="primary">
+              <Download size={16} />
+            </IconButton>
+          )}
+        </TableCell>
+      </TableRow>
+      {hasMultipleBranches && (
+        <TableRow>
+          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={10}>
+            <Collapse in={open} timeout="auto" unmountOnExit>
+              <Box sx={{ margin: 1, p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 2 }}>
+                <Typography variant="subtitle2" gutterBottom component="div" sx={{ color: 'text.secondary' }}>
+                  Assignments Breakdown
+                </Typography>
+                <Table size="small" aria-label="purchases">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Firm / Branch</TableCell>
+                      <TableCell>Base Salary</TableCell>
+                      <TableCell>PF Deduction</TableCell>
+                      <TableCell>Deductions</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Net Contribution</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {p.branch_distributions.map((branch) => (
+                      <TableRow key={branch.id}>
+                        <TableCell sx={{ textTransform: 'capitalize' }}>{branch.firm_name}</TableCell>
+                        <TableCell>₹{parseFloat(branch.base_salary).toLocaleString('en-IN')}</TableCell>
+                        <TableCell sx={{ color: parseFloat(branch.pf_deduction) > 0 ? 'error.main' : 'inherit' }}>
+                          {parseFloat(branch.pf_deduction) > 0 ? `-₹${parseFloat(branch.pf_deduction).toLocaleString('en-IN')}` : '--'}
+                        </TableCell>
+                        <TableCell>₹{parseFloat(parseFloat(branch.unpaid_leave_deduction) + parseFloat(branch.absent_deduction) + parseFloat(branch.advance_deduction)).toLocaleString('en-IN')}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>₹{parseFloat(branch.net_salary).toLocaleString('en-IN')}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            </Collapse>
+          </TableCell>
+        </TableRow>
+      )}
+    </React.Fragment>
+  );
+};
 
 export default function Payroll() {
   const { user } = useSelector((state) => state.auth);
@@ -309,6 +431,7 @@ export default function Payroll() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
+                      <TableCell sx={{ width: 40 }} />
                       {isAdmin && <TableCell sx={{ fontWeight: 700 }}>Employee</TableCell>}
                       <TableCell sx={{ fontWeight: 700 }}>Period</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Base Salary</TableCell>
@@ -323,80 +446,19 @@ export default function Payroll() {
                   <TableBody>
                     {payrolls.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 9 : 8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                        <TableCell colSpan={isAdmin ? 10 : 9} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                           No payslips recorded.
                         </TableCell>
                       </TableRow>
                     ) : (
                       payrolls.map((p) => (
-                        <TableRow key={p.id}>
-                          {isAdmin && <TableCell sx={{ fontWeight: 600 }}>{p.employee_name}</TableCell>}
-                          <TableCell>{p.month}/{p.year}</TableCell>
-                          <TableCell>
-                            ₹{parseFloat(p.base_salary).toLocaleString('en-IN')}
-                            {parseFloat(p.bonus) > 0 && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                                <Typography sx={{ fontSize: '0.75rem', color: 'success.main', fontWeight: 500 }}>
-                                  +₹{parseFloat(p.bonus).toLocaleString('en-IN')} Bonus
-                                </Typography>
-                                {p.status === 'DRAFT' && (
-                                  <Typography 
-                                    component="span"
-                                    onClick={() => handleRemoveBonus(p.id)}
-                                    sx={{ 
-                                      fontSize: '0.7rem', 
-                                      color: 'error.main', 
-                                      cursor: 'pointer',
-                                      textDecoration: 'underline',
-                                      ml: 0.5,
-                                      '&:hover': { color: 'error.dark' }
-                                    }}
-                                  >
-                                    (Remove)
-                                  </Typography>
-                                )}
-                              </Box>
-                            )}
-                          </TableCell>
-                          <TableCell>₹{parseFloat(p.overtime_pay).toLocaleString('en-IN')}</TableCell>
-                          <TableCell>
-                            ₹{parseFloat(parseFloat(p.advance_deduction) + parseFloat(p.unpaid_leave_deduction) + parseFloat(p.absent_deduction)).toLocaleString('en-IN')}
-                            {parseFloat(p.already_paid) > 0 && (
-                              <Box sx={{ fontSize: '0.75rem', color: 'error.main', mt: 0.5 }}>
-                                -₹{parseFloat(p.already_paid).toLocaleString('en-IN')} Prev Paid
-                              </Box>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {parseFloat(p.pf_deduction) > 0 ? (
-                              <Typography color="error.main" variant="body2" sx={{ fontWeight: 600 }}>
-                                -₹{parseFloat(p.pf_deduction).toLocaleString('en-IN')}
-                              </Typography>
-                            ) : (
-                              '--'
-                            )}
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>₹{parseFloat(p.net_salary).toLocaleString('en-IN')}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={p.status} 
-                              size="small" 
-                              color={p.status === 'PAID' ? 'success' : p.status === 'APPROVED' ? 'primary' : 'default'} 
-                              sx={{ fontWeight: 600, fontSize: '0.7rem' }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {isAdmin && p.status === 'DRAFT' ? (
-                              <Button variant="outlined" size="small" onClick={() => handlePayout(p.id)}>
-                                Payout
-                              </Button>
-                            ) : (
-                              <IconButton color="primary">
-                                <Download size={16} />
-                              </IconButton>
-                            )}
-                          </TableCell>
-                        </TableRow>
+                        <PayslipRow 
+                          key={p.id} 
+                          p={p} 
+                          isAdmin={isAdmin} 
+                          handlePayout={handlePayout} 
+                          handleRemoveBonus={handleRemoveBonus} 
+                        />
                       ))
                     )}
                   </TableBody>
