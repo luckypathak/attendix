@@ -346,8 +346,10 @@ class AttendanceService:
 
         # Calculate Half Day / Present based on Company Attendance Policy
         company = getattr(attendance.employee, 'company', None)
-        full_day_hours = float(company.full_day_hours) if company else 8.0
-        half_day_hours = float(company.half_day_hours) if company else 4.0
+        shift_hours = float(shift.duration_hours) if shift else 9.0
+        
+        full_day_hours = shift_hours
+        half_day_hours = (shift_hours / 2.0) + 1.0
 
         # Check if user has 3 or more auto-checkouts (3 strikes rule)
         profile = getattr(attendance.employee, 'employee_profile', None)
