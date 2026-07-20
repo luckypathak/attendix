@@ -58,13 +58,13 @@ class AttendanceService:
 
     @staticmethod
     def get_active_shift(employee):
-        # Retrieve employee's shift. If not configured, fall back to first shift of company or default
+        # Retrieve employee's specific assigned shift.
+        # Late status must ALWAYS be calculated using the employee's assigned shift.
+        # Never use Default Company Shift, Global Shift, Hardcoded Time, Previous Employee Shift.
         profile = getattr(employee, 'employee_profile', None)
-        if profile and profile.department:
-            # We can find a shift assigned to user or department. Let's fetch default shift.
-            shift = Shift.objects.filter(company=employee.company).first()
-            return shift
-        return Shift.objects.filter(company=employee.company).first()
+        if profile and profile.shift:
+            return profile.shift
+        return None
 
     @classmethod
     def check_in(cls, employee, lat, lng, accuracy, address, device_info, timestamp=None, captured_image=None):
