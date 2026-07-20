@@ -51,11 +51,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(() => {
-      fetchDashboardData(true);
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [isAdmin, selectedFirm]);
+    
+    // Only run polling for Admins OR if the employee is currently Checked In
+    if (isAdmin || employeeDashboard.status === 'Checked In') {
+      const interval = setInterval(() => {
+        fetchDashboardData(true);
+      }, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [isAdmin, selectedFirm, employeeDashboard.status]);
 
   const fetchDashboardData = async (isPolling = false) => {
     if (!isPolling) setLoading(true);
