@@ -24,7 +24,7 @@ export default function useBackgroundLocation(isCheckedIn, workCategory, company
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(async (position) => {
           try {
-            await api.post('/attendance/ping/', {
+            await api.post('/attendance/records/ping/', {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
               accuracy: position.coords.accuracy,
