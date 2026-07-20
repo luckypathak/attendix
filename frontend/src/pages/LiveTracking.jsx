@@ -32,7 +32,9 @@ export default function LiveTracking() {
     if (selectedEmpId) {
       fetchTrackingHistory(selectedEmpId);
       const interval = setInterval(() => {
-        fetchTrackingHistory(selectedEmpId);
+        if (!document.hidden) {
+          fetchTrackingHistory(selectedEmpId);
+        }
       }, 30000); // refresh every 30s
       return () => clearInterval(interval);
     }

@@ -55,7 +55,10 @@ export default function Dashboard() {
     // Only run polling for Admins OR if the employee is currently Checked In
     if (isAdmin || employeeDashboard.status === 'Checked In') {
       const interval = setInterval(() => {
-        fetchDashboardData(true);
+        // Stop polling if the browser tab is hidden/backgrounded to save Redis and DB load
+        if (!document.hidden) {
+          fetchDashboardData(true);
+        }
       }, 60000);
       return () => clearInterval(interval);
     }
