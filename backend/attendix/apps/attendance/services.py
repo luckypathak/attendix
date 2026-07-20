@@ -531,8 +531,9 @@ class AttendanceService:
                         pending_request.rejected_reason = 'AUTO REJECTED (Timeout)'
                         pending_request.save()
                         
-                        # Set checkout EXACTLY at shift end time (as requested by user)
-                        final_checkout_dt = shift_end_dt
+                        # Set checkout EXACTLY at shift end time + grace minutes (as requested by user)
+                        grace_period_mins = getattr(shift, 'grace_period_minutes', 15)
+                        final_checkout_dt = shift_end_dt + datetime.timedelta(minutes=grace_period_mins)
 
                         cls._perform_auto_checkout(session, employee, attendance, final_checkout_dt, shift)
 

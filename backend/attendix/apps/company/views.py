@@ -104,8 +104,14 @@ class DashboardStatsView(APIView):
             from attendix.apps.employee.models import EmployeeProfile
 
             # Execute Absent Engine to mark employees who haven't checked in as ABSENT
-            from attendix.apps.attendance.services import AttendanceService
-            AttendanceService.mark_absentees_for_date(user.company, today)
+            # REMOVED: AttendanceService.mark_absentees_for_date(user.company, today)
+            # This is now handled by the Daily Attendance Reconciliation Engine and Auto Absent Celery Beat task.
+
+            from django.core.cache import cache
+            cache_key = f"dashboard_stats_{user.id}_{firm_id or 'all'}_{today}"
+            cached_stats = cache.get(cache_key)
+            if cached_stats:
+                return Response(cached_stats)
 
             # 1. Attendance Stats
             total_employees = EmployeeProfile.objects.filter(**emp_q).count()
@@ -247,11 +253,13 @@ class DashboardStatsView(APIView):
                 
             stats['attendance']['history'] = auto_checkout_history
 
-            return Response({
+            payload = {
                 "role": user.role,
                 "stats": stats,
                 "trends": trends
-            })
+            }
+            cache.set(cache_key, payload, timeout=60)
+            return Response(payload)
 
         else:
             # Employee Dashboard Metrics

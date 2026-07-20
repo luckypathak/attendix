@@ -71,7 +71,9 @@ class Command(BaseCommand):
                             ot.admin_remarks = 'AUTO_REJECTED_TIMEOUT'
                             ot.save()
                     
-                    session.check_out_time = now_dt.time()
+                    grace_period_mins = getattr(shift, 'grace_period_minutes', 15)
+                    auto_checkout_time = (shift_end_dt + timedelta(minutes=grace_period_mins)).time()
+                    session.check_out_time = auto_checkout_time
                     session.auto_checkout = True
                     session.ot_status = 'REJECTED'
                     session.save()
