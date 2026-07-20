@@ -53,7 +53,7 @@ export default function Dashboard() {
     fetchDashboardData();
     const interval = setInterval(() => {
       fetchDashboardData(true);
-    }, 5000);
+    }, 60000);
     return () => clearInterval(interval);
   }, [isAdmin, selectedFirm]);
 
