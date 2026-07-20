@@ -26,6 +26,11 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 def check_active_overtimes_task(self):
     """1. Auto Checkout Engine: Every minute"""
     logger.info("Starting Auto Checkout Engine.")
+    
+    from attendix.apps.attendance.models import AttendanceSession
+    if not AttendanceSession.objects.filter(check_out_time__isnull=True).exists():
+        return "Skipped (No active users checked in)"
+        
     from attendix.apps.attendance.services import AttendanceService
     AttendanceService.check_active_overtimes_and_autocheckout()
     return "Check completed."
@@ -34,8 +39,13 @@ def check_active_overtimes_task(self):
 def location_tracker_task(self):
     """2. Location Tracker: Every 5 minutes"""
     logger.info("Starting Location Tracker.")
-    now = timezone.localtime(timezone.now())
+    from attendix.apps.attendance.models import AttendanceSession
     active_sessions = AttendanceSession.objects.filter(check_out_time__isnull=True).select_related('attendance__employee__company')
+    
+    if not active_sessions.exists():
+        return "Skipped (No active users checked in)"
+        
+    now = timezone.localtime(timezone.now())
     
     for session in active_sessions:
         employee = session.attendance.employee
@@ -71,6 +81,10 @@ def location_tracker_task(self):
 def attendance_status_recalculation_task(self):
     """3. Attendance Status Recalculation: Every 15 minutes"""
     logger.info("Recalculating attendance metrics.")
+    from attendix.apps.attendance.models import AttendanceSession
+    if not AttendanceSession.objects.filter(check_out_time__isnull=True).exists():
+        return "Skipped (No active users checked in)"
+        
     from attendix.apps.attendance.services import AttendanceService
     today = timezone.localtime(timezone.now()).date()
     active_att = Attendance.objects.filter(date=today, sessions__check_out_time__isnull=True).distinct()
